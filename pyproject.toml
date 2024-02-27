@@ -35,6 +35,13 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "C4", "SIM", "RET"]
 
+[tool.ruff.lint.per-file-ignores]
+# A test that a property refuses has to evaluate the property on its own.
+"tests/*" = ["B018"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["qu_imager"]
+
 [tool.mypy]
 python_version = "3.11"
 files = ["src"]
