@@ -151,6 +151,9 @@ class Length:
     def format_inch(self, places: int = 3) -> str:
         return f"{_quantize(self.inch, places)} in"
 
+    def format_m(self, places: int = 1) -> str:
+        return f"{_quantize(self.m, places)} m"
+
     def __str__(self) -> str:
         return self.format_mm()
 
