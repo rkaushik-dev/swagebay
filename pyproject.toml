@@ -36,8 +36,9 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "B", "UP", "C4", "SIM", "RET"]
 
 [tool.ruff.lint.per-file-ignores]
-# A test that a property refuses has to evaluate the property on its own.
-"tests/*" = ["B018"]
+# A test that a property refuses has to evaluate the property on its own, and
+# a test that pins a published constant reads better with the constant first.
+"tests/*" = ["B018", "SIM300"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["qu_imager"]
