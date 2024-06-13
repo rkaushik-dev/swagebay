@@ -48,3 +48,51 @@ def twelve_inch_weld():
 @pytest.fixture
 def on_d7():
     return ImagingSystem.from_film(film("d7"))
+
+
+@pytest.fixture
+def crew():
+    from datetime import date
+
+    from qu_imager.personnel import Level, LicenceRole, Person
+
+    reader = Person(
+        badge="0142",
+        name="lead hand",
+        level=Level.LEVEL_II,
+        licence_role=LicenceRole.RADIOGRAPHER,
+        certified_on=date(2023, 1, 15),
+        near_vision_on=date(2024, 1, 10),
+        colour_perception_on=date(2024, 1, 10),
+    )
+    helper = Person(
+        badge="0201",
+        name="assistant",
+        level=Level.LEVEL_I,
+        licence_role=LicenceRole.ASSISTANT,
+        certified_on=date(2023, 6, 1),
+        near_vision_on=date(2024, 1, 10),
+        colour_perception_on=date(2024, 1, 10),
+    )
+    return (reader, helper)
+
+
+@pytest.fixture
+def kitted():
+    from datetime import date
+
+    from qu_imager.safety.dosimetry import Assignment, Dosimeter, DosimeterKind
+
+    due = date(2025, 1, 1)
+
+    def kit(badge):
+        return Assignment(
+            badge=badge,
+            dosimeters=(
+                Dosimeter(DosimeterKind.BADGE, f"B-{badge}"),
+                Dosimeter(DosimeterKind.DIRECT_READING, f"D-{badge}", due),
+                Dosimeter(DosimeterKind.ALARMING_RATEMETER, f"A-{badge}", due),
+            ),
+        )
+
+    return (kit("0142"), kit("0201"))
