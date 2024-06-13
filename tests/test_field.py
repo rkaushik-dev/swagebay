@@ -150,3 +150,39 @@ def test_the_posting_text_is_what_goes_on_the_sign():
     assert BoundaryKind.HIGH_RADIATION.sign_reads == "danger high radiation area"
     assert BoundaryKind.RESTRICTED.rate == mr_per_hour(2)
     assert str(BoundaryKind.RADIATION_AREA) == "radiation area"
+
+
+def test_a_boundary_can_be_projected_from_a_meter_reading():
+    plan = bare()
+    reading = plan.rate_at(Length.from_m(10), DOWN)
+    projected = plan.distance_from_reading(reading, Length.from_m(10), mr_per_hour(2))
+    from_table = plan.boundary(BoundaryKind.RESTRICTED, DOWN)
+    assert abs(projected.um - from_table.um) < 100_000
+
+
+def test_a_reading_carries_whatever_scatter_the_site_produced():
+    plan = bare()
+    hot = mr_per_hour(plan.rate_at(Length.from_m(10), DOWN).mr_per_hour * 2)
+    projected = plan.distance_from_reading(hot, Length.from_m(10), mr_per_hour(2))
+    assert projected > plan.boundary(BoundaryKind.RESTRICTED, DOWN)
+
+
+def test_projecting_a_reading_rounds_away_from_the_source():
+    plan = bare()
+    projected = plan.distance_from_reading(mr_per_hour(200), Length.from_m(1), mr_per_hour(2))
+    assert projected == Length.from_m(10)
+
+
+def test_projecting_needs_a_real_distance_and_a_real_target():
+    plan = bare()
+    with pytest.raises(ValidationError):
+        plan.distance_from_reading(mr_per_hour(200), Length.ZERO, mr_per_hour(2))
+    with pytest.raises(ValidationError):
+        plan.distance_from_reading(mr_per_hour(200), Length.from_m(1), DoseRate.ZERO)
+
+
+def test_a_reading_of_nothing_projects_to_no_boundary():
+    plan = bare()
+    assert plan.distance_from_reading(DoseRate.ZERO, Length.from_m(1), mr_per_hour(2)) == (
+        Length.ZERO
+    )

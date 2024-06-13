@@ -112,6 +112,29 @@ class RadiationField:
             micrometres = metres * 1_000_000
         return Length(int(micrometres.to_integral_value(rounding=ROUND_CEILING)))
 
+    def distance_from_reading(
+        self, reading: DoseRate, taken_at: Length, target: DoseRate
+    ) -> Length:
+        """The same question, started from a meter reading rather than the table.
+
+        A crew that has walked out and read forty millirem at ten metres knows
+        more than the table does, because the reading has whatever scatter the
+        site produces already in it. Projecting that reading is the honest way
+        to place a boundary and it is what the procedure asks for whenever a
+        meter is to hand.
+        """
+        if target.nsv_per_hour <= 0:
+            raise ValidationError("a boundary needs a positive rate")
+        if taken_at.um <= 0:
+            raise ValidationError("a reading needs a distance")
+        if reading.nsv_per_hour == 0:
+            return Length.ZERO
+        with localcontext() as ctx:
+            ctx.prec = 28
+            ratio = (Decimal(reading.nsv_per_hour) / Decimal(target.nsv_per_hour)).sqrt()
+            micrometres = Decimal(taken_at.um) * ratio
+        return Length(int(micrometres.to_integral_value(rounding=ROUND_CEILING)))
+
     def boundary(self, kind: BoundaryKind, bearing_degrees: Decimal) -> Length:
         return self.distance_to(kind.rate, bearing_degrees)
 
