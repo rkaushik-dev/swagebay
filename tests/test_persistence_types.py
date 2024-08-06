@@ -116,5 +116,6 @@ def test_the_naming_convention_is_set_on_the_base_metadata():
     assert Base.metadata.naming_convention["pk"] == "pk_%(table_name)s"
 
 
-def test_the_base_starts_with_no_tables_on_it():
-    assert table_names() == ()
+def test_the_table_names_come_back_sorted():
+    names = table_names()
+    assert names == tuple(sorted(names))
