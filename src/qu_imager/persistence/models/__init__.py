@@ -7,5 +7,21 @@ whatever happened to be imported first and no error at all.
 """
 
 from qu_imager.persistence.models.reference import FilmRow, IsotopeRow, MaterialRow
+from qu_imager.persistence.models.sources import (
+    DeviceRow,
+    LeakTestRow,
+    SightingRow,
+    SourceRow,
+    TripRow,
+)
 
-__all__ = ["FilmRow", "IsotopeRow", "MaterialRow"]
+__all__ = [
+    "DeviceRow",
+    "FilmRow",
+    "IsotopeRow",
+    "LeakTestRow",
+    "MaterialRow",
+    "SightingRow",
+    "SourceRow",
+    "TripRow",
+]
