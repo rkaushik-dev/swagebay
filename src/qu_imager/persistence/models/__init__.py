@@ -14,14 +14,24 @@ from qu_imager.persistence.models.sources import (
     SourceRow,
     TripRow,
 )
+from qu_imager.persistence.models.work import (
+    IndicationRow,
+    JobRow,
+    RadiographRow,
+    WeldRow,
+)
 
 __all__ = [
     "DeviceRow",
     "FilmRow",
+    "IndicationRow",
     "IsotopeRow",
+    "JobRow",
     "LeakTestRow",
     "MaterialRow",
+    "RadiographRow",
     "SightingRow",
     "SourceRow",
     "TripRow",
+    "WeldRow",
 ]
