@@ -7,6 +7,12 @@ whatever happened to be imported first and no error at all.
 """
 
 from qu_imager.persistence.models.reference import FilmRow, IsotopeRow, MaterialRow
+from qu_imager.persistence.models.safety import (
+    DoseEntryRow,
+    DosimeterRow,
+    SurveyPointRow,
+    SurveyRow,
+)
 from qu_imager.persistence.models.sources import (
     DeviceRow,
     LeakTestRow,
@@ -23,6 +29,8 @@ from qu_imager.persistence.models.work import (
 
 __all__ = [
     "DeviceRow",
+    "DoseEntryRow",
+    "DosimeterRow",
     "FilmRow",
     "IndicationRow",
     "IsotopeRow",
@@ -32,6 +40,8 @@ __all__ = [
     "RadiographRow",
     "SightingRow",
     "SourceRow",
+    "SurveyPointRow",
+    "SurveyRow",
     "TripRow",
     "WeldRow",
 ]
