@@ -6,6 +6,7 @@ package rather than the individual modules, or it will build a schema with
 whatever happened to be imported first and no error at all.
 """
 
+from qu_imager.persistence.models.counters import CounterRow
 from qu_imager.persistence.models.reference import FilmRow, IsotopeRow, MaterialRow
 from qu_imager.persistence.models.safety import (
     DoseEntryRow,
@@ -28,6 +29,7 @@ from qu_imager.persistence.models.work import (
 )
 
 __all__ = [
+    "CounterRow",
     "DeviceRow",
     "DoseEntryRow",
     "DosimeterRow",
