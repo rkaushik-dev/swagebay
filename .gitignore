@@ -10,3 +10,4 @@ build/
 dist/
 .venv/
 *.sqlite3
+qu_imager.sqlite3
