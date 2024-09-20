@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from decimal import Decimal, localcontext
 
 from qu_imager.errors import TechniqueError, ValidationError
-from qu_imager.imaging.wire_selection import TechniqueClass
+from qu_imager.imaging.selection import TechniqueClass
 from qu_imager.quantities.length import Length
 
 REFERENCE_RESOLUTION = Length.from_mm("0.0886")

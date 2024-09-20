@@ -16,8 +16,8 @@ from qu_imager.imaging.density import Calibration, Reading, grade
 from qu_imager.imaging.film import film
 from qu_imager.imaging.indicators import HoleIndicator, HoleSize, WireIndicator
 from qu_imager.imaging.noise import NoiseMeasurement
+from qu_imager.imaging.selection import TechniqueClass
 from qu_imager.imaging.system import ImagingSystem
-from qu_imager.imaging.wire_selection import TechniqueClass
 from qu_imager.quantities.length import mm
 
 CHECKED = datetime(2024, 5, 20, 6, 0)

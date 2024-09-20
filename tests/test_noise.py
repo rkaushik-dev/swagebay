@@ -12,7 +12,7 @@ from qu_imager.imaging.noise import (
     required_normalised_snr,
     shortfall,
 )
-from qu_imager.imaging.wire_selection import TechniqueClass
+from qu_imager.imaging.selection import TechniqueClass
 from qu_imager.quantities.length import Length, mm
 
 A = TechniqueClass.A

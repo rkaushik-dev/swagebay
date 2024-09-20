@@ -14,8 +14,8 @@ from qu_imager.imaging.admissibility import Evidence, IndicatorEvidence
 from qu_imager.imaging.density import Calibration, Reading, grade
 from qu_imager.imaging.film import film as film_system
 from qu_imager.imaging.indicators import HoleIndicator, HoleSize
+from qu_imager.imaging.selection import TechniqueClass
 from qu_imager.imaging.system import ImagingSystem
-from qu_imager.imaging.wire_selection import TechniqueClass
 from qu_imager.materials import STEEL
 from qu_imager.persistence.unit_of_work import (
     build_engine,

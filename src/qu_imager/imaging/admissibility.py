@@ -30,8 +30,8 @@ from qu_imager.imaging.density import DensityVerdict
 from qu_imager.imaging.duplex import resolution_from_reading
 from qu_imager.imaging.indicators import HoleIndicator, HoleSize, WireIndicator
 from qu_imager.imaging.noise import NoiseMeasurement, required_normalised_snr
+from qu_imager.imaging.selection import TechniqueClass
 from qu_imager.imaging.system import ImagingSystem, Medium
-from qu_imager.imaging.wire_selection import TechniqueClass
 from qu_imager.quantities.length import Length
 
 
