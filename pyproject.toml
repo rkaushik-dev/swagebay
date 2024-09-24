@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69.0.0", "wheel"]
+requires = ["setuptools>=75.8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,13 +10,26 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 authors = [{ name = "rkaushik-dev" }]
-dependencies = []
+dependencies = [
+  "SQLAlchemy==2.0.38",
+  "alembic==1.14.1",
+  "fastapi==0.115.8",
+  "pydantic==2.10.6",
+  "uvicorn[standard]==0.34.0",
+  "click==8.1.8",
+]
+
+[project.scripts]
+qu-imager = "qu_imager.cli.main:run"
 
 [project.optional-dependencies]
 dev = [
-  "pytest==8.0.0",
-  "ruff==0.2.1",
-  "mypy==1.8.0",
+  "pytest==8.3.4",
+  "pytest-cov==6.0.0",
+  "httpx==0.28.1",
+  "hypothesis==6.125.3",
+  "ruff==0.9.6",
+  "mypy==1.15.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -26,6 +39,11 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 addopts = "-q"
+filterwarnings = [
+  # Starlette reaches for an anyio alias anyio has deprecated. Not ours to
+  # fix and not worth reading on every run.
+  "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100
@@ -38,7 +56,10 @@ select = ["E", "F", "I", "B", "UP", "C4", "SIM", "RET"]
 [tool.ruff.lint.per-file-ignores]
 # A test that a property refuses has to evaluate the property on its own, and
 # a test that pins a published constant reads better with the constant first.
-"tests/*" = ["B018", "SIM300"]
+"tests/*" = ["B018", "SIM300", "B008"]
+# Routes declare their query parameters and bodies as call defaults. That is
+# the framework calling convention and there is no other way to write it.
+"src/qu_imager/api/*" = ["B008"]
 # A migration is generated, and a check constraint reads as one line of sql.
 # Wrapping one makes it harder to compare against the model it came from.
 "migrations/*" = ["E501"]

@@ -26,6 +26,7 @@ from types import TracebackType
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from qu_imager.errors import ConflictError
 from qu_imager.persistence.base import Base
@@ -38,6 +39,26 @@ from qu_imager.persistence.repositories import (
 
 
 def build_engine(url: str = "sqlite://", echo: bool = False) -> Engine:
+    """An engine, with the one sqlite quirk that has to be handled here.
+
+    An in memory sqlite database belongs to the connection that made it, and
+    the default pool hands a different connection to every thread. A web
+    request served on a worker thread therefore gets an empty database and the
+    failure reads as a missing table, which sends everybody looking at the
+    migrations. A static pool shares the one connection and the memory database
+    behaves the way anybody would expect.
+
+    Nothing changes for a real file backed database, which is the only kind
+    that runs anywhere other than a test.
+    """
+    if url in {"sqlite://", "sqlite:///:memory:"}:
+        return create_engine(
+            url,
+            echo=echo,
+            future=True,
+            poolclass=StaticPool,
+            connect_args={"check_same_thread": False},
+        )
     return create_engine(url, echo=echo, future=True)
 
 
