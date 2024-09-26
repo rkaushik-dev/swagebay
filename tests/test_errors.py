@@ -82,3 +82,15 @@ def test_raising_the_base_still_carries_context():
     with pytest.raises(QuImagerError) as caught:
         raise QuImagerError("something", weld="GW-104")
     assert caught.value.context == {"weld": "GW-104"}
+
+
+def test_a_validation_error_is_also_a_value_error():
+    assert issubclass(ValidationError, ValueError)
+    assert issubclass(UnitError, ValueError)
+    with pytest.raises(ValueError):
+        raise ValidationError("that is not a length")
+
+
+def test_the_other_branches_are_not_value_errors():
+    for cls in (TechniqueError, QualificationError, SafetyError, ConflictError):
+        assert not issubclass(cls, ValueError)

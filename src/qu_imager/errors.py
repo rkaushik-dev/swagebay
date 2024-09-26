@@ -45,8 +45,15 @@ class ConfigurationError(QuImagerError):
     code = "qi.configuration"
 
 
-class ValidationError(QuImagerError):
-    """A value handed in by a caller is outside what the domain allows."""
+class ValidationError(QuImagerError, ValueError):
+    """A value handed in by a caller is outside what the domain allows.
+
+    This one is also a ValueError, and deliberately. A bad value is a bad
+    value, so anything that catches ValueError should catch this, and the two
+    places that matter are pydantic, which wraps a ValueError raised in a
+    validator into a proper field error, and every ordinary try block anybody
+    writes around a parse.
+    """
 
     code = "qi.validation"
 
