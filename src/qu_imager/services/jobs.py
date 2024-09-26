@@ -70,7 +70,7 @@ class NewWeld:
 
 def open_job(work: UnitOfWork, request: NewJob) -> JobNumber:
     """Take the next serial for the year and write the job with it."""
-    jobs = _jobs(work)
+    jobs = work.jobs
     year = request.opened_on.year % 100
     serial = jobs.next_serial(year)
     number = JobNumber(year=year, serial=serial)
@@ -91,8 +91,8 @@ def open_job(work: UnitOfWork, request: NewJob) -> JobNumber:
 
 def add_weld(work: UnitOfWork, number: JobNumber, request: NewWeld) -> None:
     """Add a weld to an open job."""
-    jobs = _jobs(work)
-    welds = _welds(work)
+    jobs = work.jobs
+    welds = work.welds
     job = jobs.get(number)
     if job.closed_on is not None:
         raise ConflictError("that job is closed", job=str(number))
@@ -119,8 +119,8 @@ def add_weld(work: UnitOfWork, number: JobNumber, request: NewWeld) -> None:
 
 def outstanding(work: UnitOfWork, number: JobNumber) -> tuple[str, ...]:
     """Everything standing between the job and being closed."""
-    jobs = _jobs(work)
-    welds = _welds(work)
+    jobs = work.jobs
+    welds = work.welds
     job = jobs.get(number)
     out: list[str] = []
     if not job.welds:
@@ -137,7 +137,7 @@ def outstanding(work: UnitOfWork, number: JobNumber) -> tuple[str, ...]:
 
 def close_job(work: UnitOfWork, number: JobNumber, on: date) -> None:
     """Close a job, refusing while anything is outstanding."""
-    jobs = _jobs(work)
+    jobs = work.jobs
     job = jobs.get(number)
     if job.closed_on is not None:
         raise ConflictError("that job is already closed", job=str(number))
@@ -148,15 +148,3 @@ def close_job(work: UnitOfWork, number: JobNumber, on: date) -> None:
         raise ConflictError("the job is not finished", job=str(number), outstanding=len(remaining))
     job.closed_on = on
     work.flush()
-
-
-def _jobs(work: UnitOfWork):  # noqa: ANN202
-    if work.jobs is None:
-        raise ConflictError("this unit of work is not open")
-    return work.jobs
-
-
-def _welds(work: UnitOfWork):  # noqa: ANN202
-    if work.welds is None:
-        raise ConflictError("this unit of work is not open")
-    return work.welds

@@ -48,8 +48,6 @@ class ReadingRecord:
 
 def record_reading(work: UnitOfWork, record: ReadingRecord) -> None:
     """Store a reading, refusing the three things a reading cannot be."""
-    if work.welds is None:
-        raise ConflictError("this unit of work is not open")
     row = work.welds.radiograph(record.radiograph_number)
 
     if not record.reader.may_interpret_on(record.read_at.date()):
@@ -79,8 +77,6 @@ def record_reading(work: UnitOfWork, record: ReadingRecord) -> None:
 
 def weld_verdict(work: UnitOfWork, job: JobNumber, weld: WeldId) -> Verdict | None:
     """The disposition, or nothing while any film is unread or inadmissible."""
-    if work.jobs is None or work.welds is None:
-        raise ConflictError("this unit of work is not open")
     job_row = work.jobs.get(job)
     weld_row = work.welds.get(job_row, weld)
     if not weld_row.radiographs:
@@ -97,8 +93,6 @@ def weld_verdict(work: UnitOfWork, job: JobNumber, weld: WeldId) -> Verdict | No
 
 def readings_outstanding(work: UnitOfWork, job: JobNumber) -> tuple[str, ...]:
     """Every film on the job still waiting for a reader."""
-    if work.jobs is None or work.welds is None:
-        raise ConflictError("this unit of work is not open")
     job_row = work.jobs.get(job)
     return tuple(r.number for r in work.welds.unread(job_row))
 

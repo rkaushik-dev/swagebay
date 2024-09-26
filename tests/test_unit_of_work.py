@@ -112,22 +112,31 @@ def test_an_explicit_rollback_undoes_the_work_so_far():
         assert work.jobs.find(JobNumber.parse("24-0418")) is not None
 
 
-def test_a_closed_unit_of_work_refuses_to_be_used():
+def test_a_unit_of_work_that_was_never_opened_refuses_to_be_used():
     work = UnitOfWork(factory())
-    with pytest.raises(ConflictError):
-        work.commit()
-    with pytest.raises(ConflictError):
-        work.rollback()
-    with pytest.raises(ConflictError):
-        work.flush()
+    for call in (work.commit, work.rollback, work.flush):
+        with pytest.raises(ConflictError):
+            call()
 
 
-def test_leaving_the_block_clears_the_repositories():
+def test_the_repositories_are_not_optional_once_the_block_is_entered():
+    made = factory()
+    with transaction(made) as work:
+        assert work.is_open
+        assert work.jobs.session is work.session
+        assert work.welds.session is work.session
+        assert work.sources.session is work.session
+
+
+def test_leaving_the_block_closes_the_repositories_too():
     work = UnitOfWork(factory())
     with work:
+        assert work.is_open
         assert work.jobs is not None
-    assert work.jobs is None
-    assert work.session is None
+    assert not work.is_open
+    for reach in ("session", "jobs", "welds", "sources", "numbering"):
+        with pytest.raises(ConflictError):
+            getattr(work, reach)
 
 
 def test_a_lookup_that_misses_still_raises_inside_a_unit_of_work():

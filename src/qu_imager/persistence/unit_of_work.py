@@ -74,19 +74,61 @@ class UnitOfWork:
 
     def __init__(self, factory: sessionmaker[Session]) -> None:
         self._factory = factory
-        self.session: Session | None = None
-        self.sources: SourceRepository | None = None
-        self.jobs: JobRepository | None = None
-        self.welds: WeldRepository | None = None
-        self.numbering: Numbering | None = None
+        self._session: Session | None = None
+        self._sources: SourceRepository | None = None
+        self._jobs: JobRepository | None = None
+        self._welds: WeldRepository | None = None
+        self._numbering: Numbering | None = None
 
     def __enter__(self) -> UnitOfWork:
-        self.session = self._factory()
-        self.sources = SourceRepository(self.session)
-        self.jobs = JobRepository(self.session)
-        self.welds = WeldRepository(self.session)
-        self.numbering = Numbering(self.session)
+        self._session = self._factory()
+        self._sources = SourceRepository(self._session)
+        self._jobs = JobRepository(self._session)
+        self._welds = WeldRepository(self._session)
+        self._numbering = Numbering(self._session)
         return self
+
+    @property
+    def is_open(self) -> bool:
+        return self._session is not None
+
+    @property
+    def session(self) -> Session:
+        """The session, or a refusal. Never None, which is the whole point.
+
+        The repositories used to be plain attributes typed as optional, so
+        every caller had to prove they were not None before using them and the
+        proof was three lines of noise at the top of every handler. Making them
+        properties that refuse moves the check to one place and takes the
+        optional out of the type.
+        """
+        if self._session is None:
+            raise ConflictError("this unit of work is not open")
+        return self._session
+
+    @property
+    def sources(self) -> SourceRepository:
+        if self._sources is None:
+            raise ConflictError("this unit of work is not open")
+        return self._sources
+
+    @property
+    def jobs(self) -> JobRepository:
+        if self._jobs is None:
+            raise ConflictError("this unit of work is not open")
+        return self._jobs
+
+    @property
+    def welds(self) -> WeldRepository:
+        if self._welds is None:
+            raise ConflictError("this unit of work is not open")
+        return self._welds
+
+    @property
+    def numbering(self) -> Numbering:
+        if self._numbering is None:
+            raise ConflictError("this unit of work is not open")
+        return self._numbering
 
     def __exit__(
         self,
@@ -94,31 +136,26 @@ class UnitOfWork:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        if self.session is None:
+        if self._session is None:
             return
         try:
-            self.session.rollback()
+            self._session.rollback()
         finally:
-            self.session.close()
-            self.session = None
-            self.sources = None
-            self.jobs = None
-            self.welds = None
-            self.numbering = None
+            self._session.close()
+            self._session = None
+            self._sources = None
+            self._jobs = None
+            self._welds = None
+            self._numbering = None
 
     def commit(self) -> None:
-        self._open().commit()
+        self.session.commit()
 
     def rollback(self) -> None:
-        self._open().rollback()
+        self.session.rollback()
 
     def flush(self) -> None:
-        self._open().flush()
-
-    def _open(self) -> Session:
-        if self.session is None:
-            raise ConflictError("this unit of work is not open")
-        return self.session
+        self.session.flush()
 
 
 def unit_of_work_factory(engine: Engine) -> sessionmaker[Session]:

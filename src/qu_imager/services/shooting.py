@@ -60,8 +60,6 @@ class ShotResult:
 
 def record_shot(work: UnitOfWork, job: JobNumber, record: ShotRecord) -> ShotResult:
     """Number the shot, store it, and say whether it is admissible."""
-    if work.jobs is None or work.welds is None or work.numbering is None:
-        raise ConflictError("this unit of work is not open")
     job_row = work.jobs.get(job)
     weld_row = work.welds.get(job_row, record.weld)
 
@@ -100,8 +98,6 @@ def record_shot(work: UnitOfWork, job: JobNumber, record: ShotRecord) -> ShotRes
 
 def exposures_recorded(work: UnitOfWork, job: JobNumber, weld: WeldId) -> tuple[int, ...]:
     """Which exposures are already on a weld, in order."""
-    if work.jobs is None or work.welds is None:
-        raise ConflictError("this unit of work is not open")
     job_row = work.jobs.get(job)
     weld_row = work.welds.get(job_row, weld)
     return tuple(sorted(r.exposure_index for r in weld_row.radiographs))
