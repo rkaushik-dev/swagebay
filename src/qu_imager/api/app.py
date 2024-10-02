@@ -40,6 +40,7 @@ def build_app(factory: sessionmaker[Session]) -> FastAPI:
     )
     app.state.session_factory = factory
     errors.install(app)
+    _install_routers(app)
 
     @app.get("/health", tags=["service"])
     def health() -> dict[str, str]:
@@ -74,3 +75,10 @@ def get_work(request: Request) -> Iterator[UnitOfWork]:
 
 
 Work = Annotated[UnitOfWork, Depends(get_work)]
+
+
+def _install_routers(app: FastAPI) -> None:
+    """Imported inside the function because the routers import this module."""
+    from qu_imager.api.routes import jobs
+
+    app.include_router(jobs.router)

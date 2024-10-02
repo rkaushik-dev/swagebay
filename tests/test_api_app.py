@@ -95,7 +95,7 @@ def test_an_error_that_is_not_ours_is_not_swallowed():
 def test_a_handler_that_returns_commits_its_unit_of_work():
     router = APIRouter()
 
-    @router.post("/jobs")
+    @router.post("/probe/write")
     def make(work: Work) -> dict[str, int]:
         work.jobs.add(
             JobRow(
@@ -111,19 +111,19 @@ def test_a_handler_that_returns_commits_its_unit_of_work():
         work.flush()
         return {"serial": 1}
 
-    @router.get("/jobs/count")
+    @router.get("/probe/count")
     def count(work: Work) -> dict[str, int]:
         return {"count": 1 if work.jobs.find(JobNumber(24, 1)) is not None else 0}
 
     with TestClient(app_with(router)) as connected:
-        assert connected.post("/jobs").status_code == 200
-        assert connected.get("/jobs/count").json() == {"count": 1}
+        assert connected.post("/probe/write").status_code == 200
+        assert connected.get("/probe/count").json() == {"count": 1}
 
 
 def test_a_handler_that_raises_rolls_its_unit_of_work_back():
     router = APIRouter()
 
-    @router.post("/jobs/bad")
+    @router.post("/probe/bad")
     def bad(work: Work) -> dict[str, int]:
         work.jobs.add(
             JobRow(
@@ -139,13 +139,13 @@ def test_a_handler_that_raises_rolls_its_unit_of_work_back():
         work.flush()
         raise ConflictError("changed my mind")
 
-    @router.get("/jobs/two")
+    @router.get("/probe/two")
     def two(work: Work) -> dict[str, int]:
         return {"count": 1 if work.jobs.find(JobNumber(24, 2)) is not None else 0}
 
     with TestClient(app_with(router)) as connected:
-        assert connected.post("/jobs/bad").status_code == 409
-        assert connected.get("/jobs/two").json() == {"count": 0}
+        assert connected.post("/probe/bad").status_code == 409
+        assert connected.get("/probe/two").json() == {"count": 0}
 
 
 def test_two_applications_do_not_share_a_database():
