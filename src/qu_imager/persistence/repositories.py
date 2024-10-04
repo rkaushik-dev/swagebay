@@ -60,13 +60,19 @@ class SourceRepository:
             select(TripRow).where(TripRow.source_id == source.id, TripRow.came_back.is_(None))
         ).one_or_none()
 
-    def device(self, serial: str) -> DeviceRow:
-        found = self.session.scalars(
+    def find_device(self, serial: str) -> DeviceRow | None:
+        return self.session.scalars(
             select(DeviceRow).where(DeviceRow.serial == serial)
         ).one_or_none()
+
+    def device(self, serial: str) -> DeviceRow:
+        found = self.find_device(serial)
         if found is None:
             raise NotFoundError("device", serial)
         return found
+
+    def devices(self) -> tuple[DeviceRow, ...]:
+        return tuple(self.session.scalars(select(DeviceRow).order_by(DeviceRow.serial)).all())
 
     def add(self, source: SourceRow) -> None:
         self.session.add(source)
