@@ -79,6 +79,7 @@ Work = Annotated[UnitOfWork, Depends(get_work)]
 
 def _install_routers(app: FastAPI) -> None:
     """Imported inside the function because the routers import this module."""
-    from qu_imager.api.routes import jobs
+    from qu_imager.api.routes import jobs, sources
 
     app.include_router(jobs.router)
+    app.include_router(sources.router)

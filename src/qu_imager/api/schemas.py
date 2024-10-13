@@ -182,3 +182,56 @@ class OutstandingOut(BaseModel):
     @property
     def is_clear(self) -> bool:
         return not self.items
+
+
+class NewSourceIn(BaseModel):
+    """A source as its certificate reads."""
+
+    model_config = ConfigDict(frozen=True)
+
+    serial: str = Field(min_length=1, max_length=40)
+    isotope: str = Field(min_length=1, max_length=20)
+    assay_curies: Decimal = Field(gt=0)
+    assay_at: datetime
+    manufacturer: str = Field(min_length=1, max_length=80)
+    model: str = Field(min_length=1, max_length=80)
+    active_diameter: LengthIn
+    active_length: LengthIn
+    working_floor_curies: Decimal = Field(default=Decimal(15), gt=0)
+
+
+class SourceOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    serial: str
+    isotope: str
+    assay_activity: ActivityOut
+    assay_at: datetime
+    state: str
+    location: str
+    focal_size: LengthOut
+
+
+class FitnessOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    serial: str
+    on: date
+    fit: bool
+    reasons: tuple[str, ...]
+
+
+class BookingIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    device_serial: str = Field(min_length=1, max_length=40)
+    crew_badge: str = Field(min_length=1, max_length=20)
+    site: str = Field(min_length=1, max_length=120)
+    went_out: date
+
+
+class ReturnIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    came_back: date
+    exposures: int = Field(default=0, ge=0)
