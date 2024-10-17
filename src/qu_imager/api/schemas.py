@@ -235,3 +235,44 @@ class ReturnIn(BaseModel):
 
     came_back: date
     exposures: int = Field(default=0, ge=0)
+
+
+class PlanIn(BaseModel):
+    """The decisions a plan needs that are not on the record."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source_serial: str = Field(min_length=1, max_length=40)
+    film: str = Field(min_length=1, max_length=20)
+    shot_at: datetime
+    shot: str | None = None
+    indicator_side: str = Field(default="source side")
+    window_minutes: int | None = Field(default=None, gt=0)
+    density: Decimal = Field(default=Decimal("2.0"), gt=0)
+
+
+class CoverageOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    exposures: int
+    separation_degrees: Decimal
+    overlap_degrees: Decimal
+
+
+class SheetOut(BaseModel):
+    """The technique sheet, as a client reads it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    weld: str
+    shot: str
+    penetrated: LengthOut
+    source_to_film: LengthOut
+    geometric_unsharpness: LengthOut
+    indicator: str
+    coverage: CoverageOut
+    exposure: DurationOut
+    total_source_out: DurationOut
+    activity: ActivityOut
+    warnings: tuple[str, ...]
+    clean: bool
