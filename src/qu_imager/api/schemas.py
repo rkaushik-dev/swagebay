@@ -276,3 +276,82 @@ class SheetOut(BaseModel):
     activity: ActivityOut
     warnings: tuple[str, ...]
     clean: bool
+
+
+class IndicatorEvidenceIn(BaseModel):
+    """What the reader could see of the indicator."""
+
+    model_config = ConfigDict(frozen=True)
+
+    hole_identity: int | None = None
+    hole_visible: bool = False
+    wire_number: int | None = None
+    finest_wire_visible: int | None = None
+
+
+class DensityReadingIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    label: str = Field(min_length=1, max_length=80)
+    density: Decimal = Field(gt=0)
+    through_indicator: bool = False
+
+
+class CalibrationIn(BaseModel):
+    """The densitometer check behind the readings."""
+
+    model_config = ConfigDict(frozen=True)
+
+    checked_at: datetime
+    step_nominal: Decimal = Field(gt=0)
+    step_read: Decimal = Field(gt=0)
+    instrument: str = Field(min_length=1, max_length=80)
+
+
+class ShotIn(BaseModel):
+    """One exposure, as the crew reports it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    exposure_index: int = Field(ge=1)
+    exposed_at: datetime
+    technique_reference: str = Field(min_length=1, max_length=80)
+    medium: str = Field(default="film")
+    film: str = Field(default="d7")
+    penetrated: LengthIn
+    technique_class: str = Field(default="A")
+    indicator: IndicatorEvidenceIn
+    densities: tuple[DensityReadingIn, ...] = ()
+    calibration: CalibrationIn | None = None
+    gamma: bool = True
+    mean_grey: Decimal | None = None
+    noise: Decimal | None = None
+    resolution: LengthIn | None = None
+
+
+class ShotOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    number: str
+    admissible: bool
+    reasons: tuple[str, ...]
+    gates_run: tuple[str, ...]
+
+
+class IndicationIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    kind: str = Field(min_length=1, max_length=8)
+    starts_at: LengthIn
+    length: LengthIn
+    width: LengthIn | None = None
+    depth_fraction: Decimal | None = None
+    clock: str | None = None
+
+
+class ReadingIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    reader_badge: str = Field(min_length=1, max_length=20)
+    read_at: datetime
+    indications: tuple[IndicationIn, ...] = ()
