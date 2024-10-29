@@ -103,8 +103,14 @@ def fail(error: QuImagerError) -> None:
     raise SystemExit(exit_status(error))
 
 
+def load_commands() -> None:
+    """Import the command modules so their decorators register the commands."""
+    from qu_imager.cli import jobs, welds  # noqa: F401
+
+
 def run() -> None:
     """The console script entry point, with the error translation round it."""
+    load_commands()
     try:
         cli.main(standalone_mode=False, obj={})
     except QuImagerError as error:
