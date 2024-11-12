@@ -27,11 +27,10 @@ from qu_imager.api.schemas import (
     OutstandingOut,
     WeldOut,
 )
-from qu_imager.errors import ConfigurationError
-from qu_imager.evaluation.acceptance import Code
 from qu_imager.geometry.joint import Joint, JointForm
 from qu_imager.identity import JobNumber, WeldId
 from qu_imager.materials import material
+from qu_imager.naming import code_named
 from qu_imager.persistence.models.work import JobRow, WeldRow
 from qu_imager.quantities.length import Length
 from qu_imager.services.jobs import NewJob, NewWeld, add_weld, close_job, open_job, outstanding
@@ -46,7 +45,7 @@ def create_job(body: NewJobIn, work: Work) -> JobOut:
         NewJob(
             client=body.client,
             site=body.site,
-            code=_code(body.acceptance_code),
+            code=code_named(body.acceptance_code),
             procedure_number=body.procedure_number,
             opened_on=body.opened_on,
         ),
@@ -99,13 +98,6 @@ def close(number: str, work: Work, on: date | None = None) -> JobOut:
     job = JobNumber.parse(number)
     close_job(work, job, on or date.today())
     return _job_out(work.jobs.get(job))
-
-
-def _code(value: str) -> Code:
-    for code in Code:
-        if code.value == value:
-            return code
-    raise ConfigurationError("no acceptance code by that name", code=value)
 
 
 def _joint(body: NewWeldIn) -> Joint:

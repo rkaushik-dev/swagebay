@@ -84,7 +84,7 @@ def test_an_unwiped_source_shows_up_as_a_warning_not_a_failure(api):
 def test_a_shot_type_nothing_knows_about_is_refused(api):
     response = api.post("/jobs/24-0001/welds/GW-104/technique", json=a_plan(shot="sideways"))
     assert response.status_code == 422
-    assert response.json()["context"]["shot"] == "sideways"
+    assert response.json()["context"]["given"] == "sideways"
 
 
 def test_an_indicator_side_nothing_knows_about_is_refused(api):

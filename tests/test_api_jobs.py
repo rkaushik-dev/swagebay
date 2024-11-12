@@ -55,8 +55,9 @@ def test_the_numbers_run_on(api):
 
 def test_an_acceptance_code_nothing_implements_is_refused(api):
     response = api.post("/jobs", json=a_job(code="BS 2600"))
-    assert response.status_code == 500
-    assert response.json()["code"] == "qi.configuration"
+    assert response.status_code == 422
+    assert response.json()["code"] == "qi.validation"
+    assert response.json()["context"]["given"] == "BS 2600"
 
 
 def test_a_job_is_read_back_by_its_number(api):

@@ -24,7 +24,6 @@ from qu_imager.api.app import Work
 from qu_imager.api.schemas import ReadingIn, ShotIn, ShotOut
 from qu_imager.errors import ValidationError
 from qu_imager.evaluation.indication import Indication
-from qu_imager.evaluation.taxonomy import by_code
 from qu_imager.identity import ClockPosition, JobNumber, WeldId
 from qu_imager.imaging.admissibility import Evidence, IndicatorEvidence
 from qu_imager.imaging.computed import plate
@@ -32,8 +31,8 @@ from qu_imager.imaging.density import Calibration, DensityVerdict, Reading, grad
 from qu_imager.imaging.film import film as film_system
 from qu_imager.imaging.indicators import HoleIndicator, HoleSize, WireIndicator
 from qu_imager.imaging.noise import NoiseMeasurement
-from qu_imager.imaging.selection import TechniqueClass
 from qu_imager.imaging.system import ImagingSystem
+from qu_imager.naming import kind_named, technique_class_named
 from qu_imager.personnel import Level, LicenceRole, Person
 from qu_imager.quantities.length import Length
 from qu_imager.services.reading import ReadingRecord, record_reading
@@ -87,7 +86,7 @@ def _evidence(body: ShotIn) -> Evidence:
     return Evidence(
         system=_system(body),
         penetrated=body.penetrated.to_length(),
-        technique_class=_class(body.technique_class),
+        technique_class=technique_class_named(body.technique_class),
         indicator=_indicator(body),
         density=_density(body),
         noise=_noise(body),
@@ -142,20 +141,9 @@ def _noise(body: ShotIn) -> NoiseMeasurement | None:
     )
 
 
-def _class(value: str) -> TechniqueClass:
-    for technique_class in TechniqueClass:
-        if technique_class.value == value.upper():
-            return technique_class
-    raise ValidationError("no technique class by that name", technique_class=value)
-
-
 def _indication(item) -> Indication:  # noqa: ANN001
-    try:
-        kind = by_code(item.kind)
-    except ValueError as unknown:
-        raise ValidationError("no discontinuity code by that name", kind=item.kind) from unknown
     return Indication(
-        kind=kind,
+        kind=kind_named(item.kind),
         starts_at=item.starts_at.to_length(),
         length=item.length.to_length(),
         width=item.width.to_length() if item.width is not None else Length.ZERO,

@@ -22,9 +22,9 @@ import click
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import bullets, heading, pairs, table, yes_no
 from qu_imager.errors import ValidationError
-from qu_imager.geometry.shot import ShotType
 from qu_imager.identity import JobNumber, WeldId
 from qu_imager.imaging.selection import IndicatorSide
+from qu_imager.naming import optional_shot_named
 from qu_imager.quantities.duration import Duration
 from qu_imager.services.planning import PlanRequest, compare_films, plan
 
@@ -63,7 +63,7 @@ def plan_command(
         source_serial=serial,
         film_key=film,
         shot_at=at,
-        shot=_shot(shot),
+        shot=optional_shot_named(shot),
         indicator_side=IndicatorSide.FILM if film_side else IndicatorSide.SOURCE,
         window=Duration.from_minutes(window) if window is not None else None,
         density=Decimal("2.0"),
@@ -119,7 +119,7 @@ def compare_command(
         source_serial=serial,
         film_key=keys[0],
         shot_at=at,
-        shot=_shot(shot),
+        shot=optional_shot_named(shot),
     )
     with work_for(ctx) as work:
         sheets = compare_films(work, JobNumber.parse(number), request, keys)
@@ -134,12 +134,3 @@ def compare_command(
         for key in keys
     ]
     click.echo(table(["film", "each", "n", "source out", "clean"], rows, numeric=[1, 2, 3]))
-
-
-def _shot(value: str | None) -> ShotType | None:
-    if value is None:
-        return None
-    for shot in ShotType:
-        if shot.value == value or shot.name.lower() == value.lower():
-            return shot
-    raise ValidationError("no shot type by that name", shot=value)

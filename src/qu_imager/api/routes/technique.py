@@ -25,9 +25,8 @@ from qu_imager.api.schemas import (
     SheetOut,
 )
 from qu_imager.errors import ValidationError
-from qu_imager.geometry.shot import ShotType
 from qu_imager.identity import JobNumber, WeldId
-from qu_imager.imaging.selection import IndicatorSide
+from qu_imager.naming import optional_shot_named, side_named
 from qu_imager.quantities.duration import Duration
 from qu_imager.services.planning import PlanRequest, compare_films, fastest_workable, plan
 from qu_imager.technique import TechniqueSheet
@@ -72,29 +71,13 @@ def _request(weld: WeldId, body: PlanIn) -> PlanRequest:
         source_serial=body.source_serial,
         film_key=body.film,
         shot_at=body.shot_at,
-        shot=_shot(body.shot),
-        indicator_side=_side(body.indicator_side),
+        shot=optional_shot_named(body.shot),
+        indicator_side=side_named(body.indicator_side),
         window=(
             Duration.from_minutes(body.window_minutes) if body.window_minutes is not None else None
         ),
         density=body.density,
     )
-
-
-def _shot(value: str | None) -> ShotType | None:
-    if value is None:
-        return None
-    for shot in ShotType:
-        if shot.value == value:
-            return shot
-    raise ValidationError("no shot type by that name", shot=value)
-
-
-def _side(value: str) -> IndicatorSide:
-    for side in IndicatorSide:
-        if side.value == value:
-            return side
-    raise ValidationError("no indicator side by that name", side=value)
 
 
 def _sheet_out(weld: WeldId, sheet: TechniqueSheet) -> SheetOut:

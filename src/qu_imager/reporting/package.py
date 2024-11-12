@@ -26,10 +26,10 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-from qu_imager.errors import ConfigurationError
 from qu_imager.evaluation.acceptance import Code, Verdict, judge
 from qu_imager.evaluation.indication import IndicationSet
 from qu_imager.identity import JobNumber, WeldId
+from qu_imager.naming import code_named
 from qu_imager.persistence.models.work import WeldRow
 from qu_imager.persistence.unit_of_work import UnitOfWork
 from qu_imager.persistence.work_mapper import row_to_indication
@@ -104,7 +104,7 @@ class Package:
 def assemble(work: UnitOfWork, number: JobNumber) -> Package:
     """Build the package from the record, and say what is missing."""
     row = work.jobs.get(number)
-    code = _code(row.acceptance_code)
+    code = code_named(row.acceptance_code)
 
     weld_lines: list[WeldLine] = []
     radiograph_lines: list[RadiographLine] = []
@@ -173,10 +173,3 @@ def _verdict(weld: WeldRow, code: Code) -> Verdict | None:
         return None
     found = tuple(row_to_indication(i) for f in films for i in f.indications)
     return judge(code, IndicationSet(weld.weld_length, found), weld.wall)
-
-
-def _code(value: str) -> Code:
-    for code in Code:
-        if code.value == value:
-            return code
-    raise ConfigurationError("the job names an acceptance code nothing implements", code=value)

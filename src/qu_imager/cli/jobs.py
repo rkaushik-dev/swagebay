@@ -19,9 +19,8 @@ import click
 
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import pairs, table, yes_no
-from qu_imager.errors import ConfigurationError
-from qu_imager.evaluation.acceptance import Code
 from qu_imager.identity import JobNumber
+from qu_imager.naming import code_named
 from qu_imager.services.jobs import NewJob, close_job, open_job, outstanding
 
 
@@ -53,7 +52,7 @@ def open_command(
             NewJob(
                 client=client,
                 site=site,
-                code=_code(code),
+                code=code_named(code),
                 procedure_number=procedure,
                 opened_on=opened,
             ),
@@ -119,10 +118,3 @@ def close_command(ctx: click.Context, number: str, on: datetime | None) -> None:
     with work_for(ctx) as work:
         close_job(work, identity, day)
     click.echo(f"closed {identity}")
-
-
-def _code(value: str) -> Code:
-    for code in Code:
-        if code.value == value:
-            return code
-    raise ConfigurationError("no acceptance code by that name", code=value)

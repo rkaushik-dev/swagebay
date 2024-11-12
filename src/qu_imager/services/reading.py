@@ -24,9 +24,10 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from qu_imager.errors import ConflictError, ValidationError
-from qu_imager.evaluation.acceptance import Code, Verdict, judge
+from qu_imager.evaluation.acceptance import Verdict, judge
 from qu_imager.evaluation.indication import Indication, IndicationSet
 from qu_imager.identity import JobNumber, WeldId
+from qu_imager.naming import code_named
 from qu_imager.persistence.unit_of_work import UnitOfWork
 from qu_imager.persistence.work_mapper import indication_to_row, row_to_indication
 from qu_imager.personnel import Person
@@ -85,7 +86,7 @@ def weld_verdict(work: UnitOfWork, job: JobNumber, weld: WeldId) -> Verdict | No
         return None
     found = tuple(row_to_indication(i) for r in weld_row.radiographs for i in r.indications)
     return judge(
-        _code(job_row.acceptance_code),
+        code_named(job_row.acceptance_code),
         IndicationSet(weld_row.weld_length, found),
         weld_row.wall,
     )
@@ -99,10 +100,3 @@ def readings_outstanding(work: UnitOfWork, job: JobNumber) -> tuple[str, ...]:
 
 def readers_available(crew: tuple[Person, ...], day: date) -> tuple[Person, ...]:
     return tuple(p for p in crew if p.may_interpret_on(day))
-
-
-def _code(value: str) -> Code:
-    for code in Code:
-        if code.value == value:
-            return code
-    raise ConflictError("the job names an acceptance code nothing implements", code=value)
