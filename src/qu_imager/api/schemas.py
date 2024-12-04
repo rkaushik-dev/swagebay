@@ -355,3 +355,63 @@ class ReadingIn(BaseModel):
     reader_badge: str = Field(min_length=1, max_length=20)
     read_at: datetime
     indications: tuple[IndicationIn, ...] = ()
+
+
+class BoundaryIn(BaseModel):
+    """A source and what is round it, for working out the rope."""
+
+    model_config = ConfigDict(frozen=True)
+
+    isotope: str = Field(min_length=1, max_length=20)
+    curies: Decimal = Field(gt=0)
+    collimator: str | None = None
+    barrier_material: str | None = None
+    barrier_thickness: LengthIn | None = None
+
+
+class BoundaryOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    kind: str
+    rate_mr_per_hour: Decimal
+    down_beam: LengthOut
+    off_beam: LengthOut
+
+
+class RopeOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    boundaries: tuple[BoundaryOut, ...]
+    directional: bool
+
+
+class SurveyPointIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    label: str = Field(min_length=1, max_length=80)
+    distance: LengthIn
+    bearing_degrees: int = 0
+    mr_per_hour: Decimal = Field(ge=0)
+    at_device_surface: bool = False
+
+
+class SurveyIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    stage: str = Field(pattern="^(before|after)$")
+    performed_at: datetime
+    performed_by: str = Field(min_length=1, max_length=40)
+    instrument: str = Field(min_length=1, max_length=80)
+    calibration_due: datetime
+    points: tuple[SurveyPointIn, ...] = ()
+
+
+class SurveyOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    radiograph: str
+    stage: str
+    clear: bool
+    faults: tuple[str, ...]
+    hottest_label: str
+    hottest_mr_per_hour: Decimal
