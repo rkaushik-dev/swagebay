@@ -134,6 +134,9 @@ class Dose:
     def format_mrem(self, places: int = 1) -> str:
         return f"{_quantize(self.mrem, places)} mrem"
 
+    def format_msv(self, places: int = 2) -> str:
+        return f"{_quantize(self.msv, places)} mSv"
+
     def __str__(self) -> str:
         return self.format_usv()
 
