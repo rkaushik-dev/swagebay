@@ -415,3 +415,35 @@ class SurveyOut(BaseModel):
     faults: tuple[str, ...]
     hottest_label: str
     hottest_mr_per_hour: Decimal
+
+
+class WeldSummaryOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    weld: str
+    wall_mm: Decimal
+    welder: str
+    radiographs: int
+    disposition: str
+    clauses: tuple[str, ...]
+
+
+class PackageOut(BaseModel):
+    """The report package, as a client reads it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    job: str
+    client: str
+    site: str
+    code: str
+    procedure: str
+    opened_on: date
+    closed_on: date | None
+    complete: bool
+    faults: tuple[str, ...]
+    welds_shot: int
+    welds_repaired: int
+    repair_rate: Decimal
+    radiographs: int
+    welds: tuple[WeldSummaryOut, ...]
