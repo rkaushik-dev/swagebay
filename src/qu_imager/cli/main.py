@@ -105,7 +105,13 @@ def fail(error: QuImagerError) -> None:
 
 def load_commands() -> None:
     """Import the command modules so their decorators register the commands."""
-    from qu_imager.cli import jobs, sources, technique, welds  # noqa: F401
+    from qu_imager.cli import (  # noqa: F401
+        jobs,
+        reports,
+        sources,
+        technique,
+        welds,
+    )
 
 
 def run() -> None:
