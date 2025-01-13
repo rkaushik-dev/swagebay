@@ -4,12 +4,7 @@ from decimal import Decimal
 import pytest
 
 from qu_imager.errors import ValidationError
-from qu_imager.persistence.unit_of_work import (
-    build_engine,
-    create_schema,
-    transaction,
-    unit_of_work_factory,
-)
+from qu_imager.persistence.unit_of_work import transaction
 from qu_imager.quantities.dose import Dose, usv
 from qu_imager.safety.dosimetry import WorkerClass
 from qu_imager.services.dose import (
@@ -24,11 +19,7 @@ from qu_imager.services.dose import (
     taken_in_year,
 )
 
-
-def factory():
-    engine = build_engine()
-    create_schema(engine)
-    return unit_of_work_factory(engine)
+from conftest import database
 
 
 def put(work, badge="0142", msv="1", month=3, source="badge"):
@@ -43,7 +34,7 @@ def put(work, badge="0142", msv="1", month=3, source="badge"):
 
 
 def test_entries_add_up_across_the_year():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="1", month=1)
         put(work, msv="2", month=6)
@@ -51,13 +42,13 @@ def test_entries_add_up_across_the_year():
 
 
 def test_somebody_with_no_entries_has_taken_nothing():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         assert taken_in_year(work, "0999", 2024) == Dose.ZERO
 
 
 def test_a_month_is_summed_on_its_own():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="1", month=3)
         put(work, msv="2", month=4)
@@ -67,14 +58,14 @@ def test_a_month_is_summed_on_its_own():
 
 
 def test_december_does_not_run_off_the_end_of_the_year():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="1", month=12)
         assert taken_in_month(work, "0142", 2024, 12) == Dose.from_msv(1)
 
 
 def test_a_month_outside_the_calendar_is_refused():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         with pytest.raises(ValidationError):
             taken_in_month(work, "0142", 2024, 13)
@@ -83,7 +74,7 @@ def test_a_month_outside_the_calendar_is_refused():
 
 
 def test_a_dose_needs_a_badge_and_a_source():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         with pytest.raises(ValidationError):
             record_dose(work, "  ", 2024, usv(10), datetime(2024, 3, 1), "badge")
@@ -92,7 +83,7 @@ def test_a_dose_needs_a_badge_and_a_source():
 
 
 def test_a_quiet_year_and_a_bad_month_disagree_and_both_are_right():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="0.2", month=1)
         put(work, msv="4", month=7)
@@ -101,7 +92,7 @@ def test_a_quiet_year_and_a_bad_month_disagree_and_both_are_right():
 
 
 def test_the_investigation_levels_read_against_the_annual_position():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="6")
         assert position(work, "0142", 2024).investigation_level == 1
@@ -110,7 +101,7 @@ def test_the_investigation_levels_read_against_the_annual_position():
 
 
 def test_the_limit_depends_on_the_worker_class():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="4")
         adult = position(work, "0142", 2024)
@@ -121,7 +112,7 @@ def test_the_limit_depends_on_the_worker_class():
 
 
 def test_what_is_left_of_the_year_runs_down_and_stops_at_zero():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="20")
         assert position(work, "0142", 2024).remaining == Dose.from_msv(30)
@@ -130,7 +121,7 @@ def test_what_is_left_of_the_year_runs_down_and_stops_at_zero():
 
 
 def test_the_badges_with_entries_come_back_sorted():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, badge="0201")
         put(work, badge="0142")
@@ -138,7 +129,7 @@ def test_the_badges_with_entries_come_back_sorted():
 
 
 def test_the_people_over_a_level_come_back_worst_first():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, badge="0142", msv="6")
         put(work, badge="0201", msv="16")
@@ -149,13 +140,13 @@ def test_the_people_over_a_level_come_back_worst_first():
 
 
 def test_there_are_only_two_investigation_levels():
-    made = factory()
+    made = database()
     with transaction(made) as work, pytest.raises(ValidationError):
         over_investigation_level(work, 2024, level=3)
 
 
 def test_the_monthly_sheet_lists_everybody_in_badge_order():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, badge="0201", msv="2", month=5)
         put(work, badge="0142", msv="1", month=5)
@@ -165,7 +156,7 @@ def test_the_monthly_sheet_lists_everybody_in_badge_order():
 
 
 def test_the_collective_dose_is_the_whole_shop():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, badge="0142", msv="2")
         put(work, badge="0201", msv="3")
@@ -174,7 +165,7 @@ def test_the_collective_dose_is_the_whole_shop():
 
 
 def test_the_burn_down_says_how_long_the_year_lasts_at_this_rate():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="5")
         left = days_left_at_this_rate(position(work, "0142", 2024), days_elapsed=100)
@@ -182,19 +173,19 @@ def test_the_burn_down_says_how_long_the_year_lasts_at_this_rate():
 
 
 def test_somebody_who_has_taken_nothing_has_no_burn_down():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         assert days_left_at_this_rate(position(work, "0999", 2024), 100) is None
 
 
 def test_a_burn_down_needs_some_of_the_year_to_have_gone():
-    made = factory()
+    made = database()
     with transaction(made) as work, pytest.raises(ValidationError):
         days_left_at_this_rate(position(work, "0142", 2024), 0)
 
 
 def test_a_position_prints_the_way_the_board_reads():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         put(work, msv="6")
         assert position(work, "0142", 2024).describe() == "0142 6.00 mSv of 50 mSv, level 1"

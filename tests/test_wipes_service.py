@@ -4,12 +4,7 @@ from decimal import Decimal
 import pytest
 
 from qu_imager.errors import NotFoundError, ValidationError
-from qu_imager.persistence.unit_of_work import (
-    build_engine,
-    create_schema,
-    transaction,
-    unit_of_work_factory,
-)
+from qu_imager.persistence.unit_of_work import transaction
 from qu_imager.quantities.activity import curie
 from qu_imager.quantities.length import mm
 from qu_imager.services.sources import Booking, register_device, register_source, send_out
@@ -22,14 +17,10 @@ from qu_imager.services.wipes import (
 from qu_imager.sources.isotope import IR192
 from qu_imager.sources.sealed import SealedSource, SourceCertificate
 
+from conftest import database
+
 ASSAY = datetime(2024, 10, 1)
 WIPED = datetime(2024, 10, 15, 9, 0)
-
-
-def factory():
-    engine = build_engine()
-    create_schema(engine)
-    return unit_of_work_factory(engine)
 
 
 def stocked(work, serial="IR-5512"):
@@ -54,7 +45,7 @@ def stocked(work, serial="IR-5512"):
 
 
 def test_a_passing_wipe_is_recorded_and_sets_the_next_due_date():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         result = record_wipe(work, "IR-5512", WIPED, Decimal(0), "rp")
@@ -64,7 +55,7 @@ def test_a_passing_wipe_is_recorded_and_sets_the_next_due_date():
 
 
 def test_a_failing_wipe_takes_the_source_out_of_service_at_once():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         result = record_wipe(work, "IR-5512", WIPED, Decimal(400), "rp")
@@ -74,7 +65,7 @@ def test_a_failing_wipe_takes_the_source_out_of_service_at_once():
 
 
 def test_the_limit_is_where_the_regulation_puts_it():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         assert record_wipe(work, "IR-5512", WIPED, Decimal(184), "rp").passed
@@ -84,7 +75,7 @@ def test_the_limit_is_where_the_regulation_puts_it():
 
 
 def test_a_wipe_needs_a_signature_and_a_believable_result():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         with pytest.raises(ValidationError):
@@ -94,20 +85,20 @@ def test_a_wipe_needs_a_signature_and_a_believable_result():
 
 
 def test_a_wipe_against_a_source_that_is_not_there_is_refused():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         record_wipe(work, "IR-9999", WIPED, Decimal(0), "rp")
 
 
 def test_a_source_never_wiped_has_no_due_date():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         assert wipe_due_on(work, "IR-5512") is None
 
 
 def test_the_latest_passing_wipe_sets_the_due_date():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         record_wipe(work, "IR-5512", WIPED, Decimal(0), "rp")
@@ -117,7 +108,7 @@ def test_the_latest_passing_wipe_sets_the_due_date():
 
 
 def test_a_failing_wipe_does_not_set_a_due_date():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         record_wipe(work, "IR-5512", WIPED, Decimal(400), "rp")
@@ -125,14 +116,14 @@ def test_a_failing_wipe_does_not_set_a_due_date():
 
 
 def test_a_source_never_wiped_is_overdue_from_the_start():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         assert wipes_overdue(work, date(2024, 10, 2)) == ("IR-5512",)
 
 
 def test_a_wiped_source_drops_off_the_overdue_list_and_comes_back_later():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         record_wipe(work, "IR-5512", WIPED, Decimal(0), "rp")
@@ -141,7 +132,7 @@ def test_a_wiped_source_drops_off_the_overdue_list_and_comes_back_later():
 
 
 def test_a_source_out_of_service_is_not_chased_for_a_wipe():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         record_wipe(work, "IR-5512", WIPED, Decimal(400), "rp")
@@ -149,7 +140,7 @@ def test_a_source_out_of_service_is_not_chased_for_a_wipe():
 
 
 def test_the_history_starts_with_the_assay():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         sheet = history(work, "IR-5512")
@@ -158,7 +149,7 @@ def test_the_history_starts_with_the_assay():
 
 
 def test_the_history_reads_forwards():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         record_wipe(work, "IR-5512", WIPED, Decimal(0), "rp")
@@ -172,7 +163,7 @@ def test_the_history_reads_forwards():
 
 
 def test_the_history_says_whether_each_wipe_passed():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         record_wipe(work, "IR-5512", WIPED, Decimal(400), "rp")
@@ -182,7 +173,7 @@ def test_the_history_says_whether_each_wipe_passed():
 
 
 def test_the_result_prints_the_way_a_note_to_the_crew_reads():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         passed = record_wipe(work, "IR-5512", WIPED, Decimal(0), "rp")

@@ -10,12 +10,7 @@ from qu_imager.geometry.shot import ShotType
 from qu_imager.identity import JobNumber, WeldId
 from qu_imager.imaging.selection import IndicatorSide
 from qu_imager.materials import STEEL
-from qu_imager.persistence.unit_of_work import (
-    build_engine,
-    create_schema,
-    transaction,
-    unit_of_work_factory,
-)
+from qu_imager.persistence.unit_of_work import transaction
 from qu_imager.quantities.activity import curie
 from qu_imager.quantities.duration import minutes
 from qu_imager.quantities.length import mm
@@ -25,16 +20,12 @@ from qu_imager.services.sources import register_source
 from qu_imager.sources.isotope import IR192
 from qu_imager.sources.sealed import LeakTest, SealedSource, SourceCertificate
 
+from conftest import database
+
 ASSAY = datetime(2024, 10, 1)
 SHOT = ASSAY + timedelta(days=20)
 OPENED = date(2024, 10, 1)
 WELD = WeldId.parse("GW-104")
-
-
-def factory():
-    engine = build_engine()
-    create_schema(engine)
-    return unit_of_work_factory(engine)
 
 
 def a_source(serial="IR-5512", wiped=True):
@@ -99,7 +90,7 @@ def a_request(film="d7", shot=ShotType.DWSI, **kwargs):
 
 
 def test_a_sheet_is_planned_from_what_is_on_the_record():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         sheet = plan(work, job, a_request())
@@ -109,14 +100,14 @@ def test_a_sheet_is_planned_from_what_is_on_the_record():
 
 
 def test_the_wall_comes_off_the_weld_and_nobody_retypes_it():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work, schedule="40")
         assert plan(work, job, a_request()).penetrated == mm("18.22")
 
 
 def test_the_source_is_decayed_to_the_night_of_the_shot():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         early = plan(work, job, a_request())
@@ -125,7 +116,7 @@ def test_the_source_is_decayed_to_the_night_of_the_shot():
 
 
 def test_a_slower_film_gives_a_longer_sheet():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         fast = plan(work, job, a_request(film="d7"))
@@ -134,7 +125,7 @@ def test_a_slower_film_gives_a_longer_sheet():
 
 
 def test_the_indicator_side_travels_through_to_the_sheet():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         sheet = plan(work, job, a_request(indicator_side=IndicatorSide.FILM))
@@ -142,7 +133,7 @@ def test_the_indicator_side_travels_through_to_the_sheet():
 
 
 def test_a_sheet_with_warnings_still_comes_back():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         sheet = plan(work, job, a_request(window=minutes(1)))
@@ -151,21 +142,21 @@ def test_a_sheet_with_warnings_still_comes_back():
 
 
 def test_a_weld_that_is_not_there_is_refused():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         job = prepared(work)
         plan(work, job, a_request(weld=WeldId.parse("GW-999")))
 
 
 def test_a_source_that_is_not_there_is_refused():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         job = prepared(work)
         plan(work, job, a_request(source_serial="IR-9999"))
 
 
 def test_a_job_that_is_not_there_is_refused_too():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         prepared(work)
         plan(work, JobNumber(24, 99), a_request())
@@ -188,7 +179,7 @@ def test_a_request_moved_onto_another_film_keeps_everything_else():
 
 
 def test_several_films_are_compared_side_by_side():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         sheets = compare_films(work, job, a_request(), ("d4", "d5", "d7"))
@@ -197,28 +188,28 @@ def test_several_films_are_compared_side_by_side():
 
 
 def test_comparing_nothing_is_refused():
-    made = factory()
+    made = database()
     with pytest.raises(ValidationError), transaction(made) as work:
         job = prepared(work)
         compare_films(work, job, a_request(), ())
 
 
 def test_the_fastest_workable_film_is_the_quickest_clean_one():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         assert fastest_workable(work, job, a_request(), ("d4", "d5", "d7")) == "d7"
 
 
 def test_nothing_workable_comes_back_as_nothing():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         assert fastest_workable(work, job, a_request(window=minutes(1)), ("d4", "d7")) is None
 
 
 def test_a_wall_off_the_end_of_the_chart_still_refuses():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         register_source(work, a_source())
         job = a_job(work)
@@ -228,7 +219,7 @@ def test_a_wall_off_the_end_of_the_chart_still_refuses():
 
 
 def test_an_unwiped_source_shows_up_as_a_warning_on_the_sheet():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work, wiped=False)
         assert any("leak test" in w for w in plan(work, job, a_request()).warnings)

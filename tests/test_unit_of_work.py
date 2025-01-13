@@ -12,18 +12,13 @@ from qu_imager.persistence.unit_of_work import (
     build_engine,
     create_schema,
     transaction,
-    unit_of_work_factory,
 )
 from qu_imager.quantities.activity import curie
 from qu_imager.quantities.length import mm
 
+from conftest import database
+
 OPENED = date(2024, 9, 2)
-
-
-def factory():
-    engine = build_engine()
-    create_schema(engine)
-    return unit_of_work_factory(engine)
 
 
 def job_row(serial=417):
@@ -53,7 +48,7 @@ def source_row(serial="IR-5512"):
 
 
 def test_work_committed_inside_the_block_is_there_afterwards():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         work.jobs.add(job_row())
     with transaction(made) as work:
@@ -61,7 +56,7 @@ def test_work_committed_inside_the_block_is_there_afterwards():
 
 
 def test_an_exception_inside_the_block_rolls_the_whole_thing_back():
-    made = factory()
+    made = database()
     with pytest.raises(RuntimeError), transaction(made) as work:
         work.jobs.add(job_row())
         work.flush()
@@ -71,7 +66,7 @@ def test_an_exception_inside_the_block_rolls_the_whole_thing_back():
 
 
 def test_a_number_taken_and_then_rolled_back_is_not_lost():
-    made = factory()
+    made = database()
     with pytest.raises(RuntimeError), transaction(made) as work:
         work.numbering.take(RADIOGRAPH, "24-0417")
         raise RuntimeError("no")
@@ -80,7 +75,7 @@ def test_a_number_taken_and_then_rolled_back_is_not_lost():
 
 
 def test_the_number_and_the_work_it_numbers_commit_together():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         work.jobs.add(job_row())
         number = work.numbering.take_radiograph_number("24-0417")
@@ -91,7 +86,7 @@ def test_the_number_and_the_work_it_numbers_commit_together():
 
 
 def test_every_repository_shares_the_one_session():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         work.sources.add(source_row())
         work.jobs.add(job_row())
@@ -101,7 +96,7 @@ def test_every_repository_shares_the_one_session():
 
 
 def test_an_explicit_rollback_undoes_the_work_so_far():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         work.jobs.add(job_row(417))
         work.flush()
@@ -113,14 +108,14 @@ def test_an_explicit_rollback_undoes_the_work_so_far():
 
 
 def test_a_unit_of_work_that_was_never_opened_refuses_to_be_used():
-    work = UnitOfWork(factory())
+    work = UnitOfWork(database())
     for call in (work.commit, work.rollback, work.flush):
         with pytest.raises(ConflictError):
             call()
 
 
 def test_the_repositories_are_not_optional_once_the_block_is_entered():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         assert work.is_open
         assert work.jobs.session is work.session
@@ -129,7 +124,7 @@ def test_the_repositories_are_not_optional_once_the_block_is_entered():
 
 
 def test_leaving_the_block_closes_the_repositories_too():
-    work = UnitOfWork(factory())
+    work = UnitOfWork(database())
     with work:
         assert work.is_open
         assert work.jobs is not None
@@ -140,7 +135,7 @@ def test_leaving_the_block_closes_the_repositories_too():
 
 
 def test_a_lookup_that_misses_still_raises_inside_a_unit_of_work():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         work.sources.get("IR-9999")
 
@@ -153,7 +148,7 @@ def test_the_schema_builder_makes_every_table():
 
 
 def test_a_second_unit_of_work_sees_the_first_one_committed():
-    made = factory()
+    made = database()
     with transaction(made) as first:
         first.sources.add(source_row())
     with transaction(made) as second:

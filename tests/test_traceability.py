@@ -1,5 +1,4 @@
 from datetime import date, datetime
-from decimal import Decimal
 
 import pytest
 
@@ -7,19 +6,10 @@ from qu_imager.errors import NotFoundError
 from qu_imager.evaluation.acceptance import Code
 from qu_imager.geometry import pipe_schedule as ps
 from qu_imager.identity import WeldId
-from qu_imager.imaging.admissibility import Evidence, IndicatorEvidence
-from qu_imager.imaging.density import Calibration, Reading, grade
 from qu_imager.imaging.film import film
-from qu_imager.imaging.indicators import HoleIndicator, HoleSize
-from qu_imager.imaging.selection import TechniqueClass
 from qu_imager.imaging.system import ImagingSystem
 from qu_imager.materials import STEEL
-from qu_imager.persistence.unit_of_work import (
-    build_engine,
-    create_schema,
-    transaction,
-    unit_of_work_factory,
-)
+from qu_imager.persistence.unit_of_work import transaction
 from qu_imager.personnel import Level, LicenceRole, Person
 from qu_imager.procedure import Code as ProcedureCode
 from qu_imager.procedure import ProcedureRegister, Revision
@@ -34,50 +24,12 @@ from qu_imager.services.jobs import NewJob, NewWeld, add_weld, open_job
 from qu_imager.services.reading import ReadingRecord, record_reading
 from qu_imager.services.shooting import ShotRecord, record_shot
 
+from conftest import a_reader, database, film_evidence
+
 OPENED = date(2024, 11, 1)
 SHOT = datetime(2024, 11, 8, 23, 0)
 READ = datetime(2024, 11, 9, 8, 0)
 ON_FILM = ImagingSystem.from_film(film("d7"))
-
-
-def factory():
-    engine = build_engine()
-    create_schema(engine)
-    return unit_of_work_factory(engine)
-
-
-def reader():
-    return Person(
-        badge="0142",
-        name="reader",
-        level=Level.LEVEL_II,
-        licence_role=LicenceRole.RADIOGRAPHER,
-        certified_on=date(2023, 1, 15),
-        near_vision_on=date(2024, 6, 1),
-        colour_perception_on=date(2024, 6, 1),
-    )
-
-
-def evidence(visible=True):
-    return Evidence(
-        system=ON_FILM,
-        penetrated=mm(26),
-        technique_class=TechniqueClass.A,
-        indicator=IndicatorEvidence(
-            required_hole=HoleIndicator(30),
-            required_hole_size=HoleSize.TWO_T,
-            hole_visible=visible,
-        ),
-        density=grade(
-            (
-                Reading("indicator", Decimal("2.50"), through_indicator=True),
-                Reading("weld", Decimal("2.50")),
-            ),
-            gamma=True,
-            calibration=Calibration(SHOT, Decimal("2.00"), Decimal("2.01"), "X-Rite"),
-            read_at=SHOT,
-        ),
-    )
 
 
 def prepared(work, visible=True, read=True):
@@ -110,11 +62,11 @@ def prepared(work, visible=True, read=True):
             exposure_index=1,
             exposed_at=SHOT,
             technique_reference="RT-001 rev 1",
-            evidence=evidence(visible),
+            evidence=film_evidence(visible=visible),
         ),
     ).number
     if read and visible:
-        record_reading(work, ReadingRecord(number, reader(), READ))
+        record_reading(work, ReadingRecord(number, a_reader(), READ))
     return job, number
 
 
@@ -144,7 +96,7 @@ def register(effective=date(2024, 1, 1)):
 
 
 def test_a_sound_chain_holds_at_every_link():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work)
         chain = chain_for(work, number)
@@ -154,7 +106,7 @@ def test_a_sound_chain_holds_at_every_link():
 
 
 def test_the_chain_names_the_job_the_weld_and_the_welder():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work)
         values = {link.name: link.value for link in chain_for(work, number).links}
@@ -165,7 +117,7 @@ def test_the_chain_names_the_job_the_weld_and_the_welder():
 
 
 def test_an_unread_film_breaks_the_reading_link():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work, read=False)
         chain = chain_for(work, number)
@@ -175,7 +127,7 @@ def test_an_unread_film_breaks_the_reading_link():
 
 
 def test_an_inadmissible_film_breaks_the_admissibility_link_and_says_why():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work, visible=False)
         chain = chain_for(work, number)
@@ -185,7 +137,7 @@ def test_an_inadmissible_film_breaks_the_admissibility_link_and_says_why():
 
 
 def test_a_link_prints_its_state_and_its_note():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work, read=False)
         text = chain_for(work, number).describe()
@@ -196,7 +148,7 @@ def test_a_link_prints_its_state_and_its_note():
 
 
 def test_the_procedure_link_is_unchecked_without_a_register():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work)
         link = next(link for link in chain_for(work, number).links if link.name == "procedure")
@@ -205,7 +157,7 @@ def test_the_procedure_link_is_unchecked_without_a_register():
 
 
 def test_the_procedure_link_resolves_the_revision_in_force_that_night():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work)
         link = next(
@@ -216,7 +168,7 @@ def test_the_procedure_link_resolves_the_revision_in_force_that_night():
 
 
 def test_a_procedure_that_was_not_yet_in_force_breaks_the_link():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work)
         later = register(effective=date(2025, 6, 1))
@@ -228,7 +180,7 @@ def test_a_procedure_that_was_not_yet_in_force_breaks_the_link():
 
 
 def test_every_chain_on_a_job_comes_back_in_radiograph_order():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job, first = prepared(work)
         second = record_shot(
@@ -239,16 +191,16 @@ def test_every_chain_on_a_job_comes_back_in_radiograph_order():
                 exposure_index=2,
                 exposed_at=SHOT,
                 technique_reference="RT-001 rev 1",
-                evidence=evidence(),
+                evidence=film_evidence(),
             ),
         ).number
-        record_reading(work, ReadingRecord(second, reader(), READ))
+        record_reading(work, ReadingRecord(second, a_reader(), READ))
         chains = chains_for_job(work, 24, 1)
         assert [c.radiograph for c in chains] == sorted([first, second])
 
 
 def test_the_broken_chains_are_the_ones_worth_reading():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job, _first = prepared(work)
         record_shot(
@@ -259,7 +211,7 @@ def test_the_broken_chains_are_the_ones_worth_reading():
                 exposure_index=2,
                 exposed_at=SHOT,
                 technique_reference="RT-001 rev 1",
-                evidence=evidence(),
+                evidence=film_evidence(),
             ),
         )
         broken = broken_chains(work, 24, 1)
@@ -268,14 +220,14 @@ def test_the_broken_chains_are_the_ones_worth_reading():
 
 
 def test_a_job_with_everything_sound_reports_no_broken_chains():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         prepared(work)
         assert broken_chains(work, 24, 1) == ()
 
 
 def test_asserting_traceability_refuses_a_broken_chain():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work, read=False)
         with pytest.raises(NotFoundError):
@@ -283,14 +235,14 @@ def test_asserting_traceability_refuses_a_broken_chain():
 
 
 def test_asserting_traceability_returns_a_sound_chain():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         _job, number = prepared(work)
         assert assert_traceable(work, number).is_sound
 
 
 def test_a_film_that_does_not_exist_has_no_chain():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         prepared(work)
         chain_for(work, "24-0001-R9999")

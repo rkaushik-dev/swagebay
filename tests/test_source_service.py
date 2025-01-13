@@ -4,12 +4,7 @@ from decimal import Decimal
 import pytest
 
 from qu_imager.errors import ConflictError, NotFoundError, ValidationError
-from qu_imager.persistence.unit_of_work import (
-    build_engine,
-    create_schema,
-    transaction,
-    unit_of_work_factory,
-)
+from qu_imager.persistence.unit_of_work import transaction
 from qu_imager.quantities.activity import curie
 from qu_imager.quantities.length import mm
 from qu_imager.services.sources import (
@@ -26,14 +21,10 @@ from qu_imager.services.sources import (
 from qu_imager.sources.isotope import IR192
 from qu_imager.sources.sealed import LeakTest, SealedSource, SourceCertificate
 
+from conftest import database
+
 ASSAY = datetime(2024, 10, 1)
 WENT = date(2024, 10, 7)
-
-
-def factory():
-    engine = build_engine()
-    create_schema(engine)
-    return unit_of_work_factory(engine)
 
 
 def a_source(serial="IR-5512", tested=True):
@@ -69,7 +60,7 @@ def a_booking(serial="IR-5512", site="Come By Chance"):
 
 
 def test_a_source_goes_on_the_inventory_once():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         assert work.sources.get("IR-5512").isotope_key == "ir192"
@@ -78,7 +69,7 @@ def test_a_source_goes_on_the_inventory_once():
 
 
 def test_a_device_goes_on_once_too():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         with pytest.raises(ConflictError):
@@ -88,14 +79,14 @@ def test_a_device_goes_on_once_too():
 
 
 def test_a_source_in_the_shop_reads_as_the_shop():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         assert location(work, "IR-5512") == "shop"
 
 
 def test_a_source_out_on_a_job_reads_as_the_site():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         send_out(work, a_booking())
@@ -103,7 +94,7 @@ def test_a_source_out_on_a_job_reads_as_the_site():
 
 
 def test_a_source_cannot_be_out_on_two_jobs():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         send_out(work, a_booking())
@@ -112,7 +103,7 @@ def test_a_source_cannot_be_out_on_two_jobs():
 
 
 def test_a_source_that_is_not_out_cannot_come_back():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         with pytest.raises(ConflictError):
@@ -120,7 +111,7 @@ def test_a_source_that_is_not_out_cannot_come_back():
 
 
 def test_bringing_a_source_back_frees_it_for_the_next_job():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         send_out(work, a_booking())
@@ -131,7 +122,7 @@ def test_bringing_a_source_back_frees_it_for_the_next_job():
 
 
 def test_a_source_cannot_come_back_before_it_went_out():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         send_out(work, a_booking())
@@ -140,7 +131,7 @@ def test_a_source_cannot_come_back_before_it_went_out():
 
 
 def test_a_negative_exposure_count_is_refused():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         send_out(work, a_booking())
@@ -156,7 +147,7 @@ def test_a_booking_needs_a_crew_and_a_site():
 
 
 def test_a_source_or_device_not_on_the_inventory_cannot_be_booked_out():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         with pytest.raises(NotFoundError):
@@ -164,14 +155,14 @@ def test_a_source_or_device_not_on_the_inventory_cannot_be_booked_out():
 
 
 def test_a_fit_source_is_reported_fit():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         assert fitness(work, "IR-5512", ASSAY + timedelta(days=30)).fit
 
 
 def test_an_untested_source_is_reported_unfit_with_the_reason():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work, tested=False)
         report = fitness(work, "IR-5512", ASSAY)
@@ -181,7 +172,7 @@ def test_an_untested_source_is_reported_unfit_with_the_reason():
 
 
 def test_fitness_depends_on_the_day_it_is_asked_about():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         assert fitness(work, "IR-5512", ASSAY + timedelta(days=30)).fit
@@ -189,7 +180,7 @@ def test_fitness_depends_on_the_day_it_is_asked_about():
 
 
 def test_a_retired_source_cannot_be_booked_out():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         retire(work, "IR-5512")
@@ -199,7 +190,7 @@ def test_a_retired_source_cannot_be_booked_out():
 
 
 def test_a_source_out_on_a_job_cannot_be_retired():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         send_out(work, a_booking())
@@ -208,7 +199,7 @@ def test_a_source_out_on_a_job_cannot_be_retired():
 
 
 def test_a_sighting_is_recorded_against_the_source():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         stocked(work)
         record_sighting(work, "IR-5512", date(2024, 10, 5), "0142", "shop")

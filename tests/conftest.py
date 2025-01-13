@@ -96,3 +96,79 @@ def kitted():
         )
 
     return (kit("0142"), kit("0201"))
+
+
+def database():
+    """One throwaway database with the schema in it, per call.
+
+    Eleven test modules had grown their own copy of this three line helper and
+    they had drifted: two built the schema before the factory and the rest
+    after, which works either way and looks like it matters. One copy.
+    """
+    from qu_imager.persistence.unit_of_work import (
+        build_engine,
+        create_schema,
+        unit_of_work_factory,
+    )
+
+    engine = build_engine()
+    create_schema(engine)
+    return unit_of_work_factory(engine)
+
+
+def a_reader(badge="0142", level=None, vision=None):
+    """A Level II with current eyes, which is what most tests want."""
+    from datetime import date
+
+    from qu_imager.personnel import Level, LicenceRole, Person
+
+    return Person(
+        badge=badge,
+        name="reader",
+        level=level or Level.LEVEL_II,
+        licence_role=LicenceRole.RADIOGRAPHER,
+        certified_on=date(2023, 1, 15),
+        near_vision_on=vision or date(2024, 6, 1),
+        colour_perception_on=vision or date(2024, 6, 1),
+    )
+
+
+def film_evidence(penetrated_mm=26, visible=True, density="2.50", at=None):
+    """A sound piece of film with a visible essential hole.
+
+    The three copies of this had different densities and different plaque
+    numbers for no reason anybody could remember, so a test that passed in one
+    module and failed in another looked like a bug in the rules rather than a
+    difference in the fixture.
+    """
+    from datetime import datetime
+    from decimal import Decimal
+
+    from qu_imager.imaging.admissibility import Evidence, IndicatorEvidence
+    from qu_imager.imaging.density import Calibration, Reading, grade
+    from qu_imager.imaging.film import film
+    from qu_imager.imaging.indicators import HoleIndicator, HoleSize
+    from qu_imager.imaging.selection import TechniqueClass
+    from qu_imager.imaging.system import ImagingSystem
+    from qu_imager.quantities.length import mm as millimetres
+
+    moment = at or datetime(2024, 11, 5, 23, 0)
+    return Evidence(
+        system=ImagingSystem.from_film(film("d7")),
+        penetrated=millimetres(penetrated_mm),
+        technique_class=TechniqueClass.A,
+        indicator=IndicatorEvidence(
+            required_hole=HoleIndicator(30),
+            required_hole_size=HoleSize.TWO_T,
+            hole_visible=visible,
+        ),
+        density=grade(
+            (
+                Reading("indicator", Decimal(density), through_indicator=True),
+                Reading("weld", Decimal(density)),
+            ),
+            gamma=True,
+            calibration=Calibration(moment, Decimal("2.00"), Decimal("2.01"), "X-Rite"),
+            read_at=moment,
+        ),
+    )

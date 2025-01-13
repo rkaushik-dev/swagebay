@@ -16,12 +16,7 @@ from qu_imager.imaging.noise import NoiseMeasurement
 from qu_imager.imaging.selection import TechniqueClass
 from qu_imager.imaging.system import ImagingSystem
 from qu_imager.materials import STEEL
-from qu_imager.persistence.unit_of_work import (
-    build_engine,
-    create_schema,
-    transaction,
-    unit_of_work_factory,
-)
+from qu_imager.persistence.unit_of_work import transaction
 from qu_imager.quantities.length import mm
 from qu_imager.services.jobs import NewJob, NewWeld, add_weld, open_job
 from qu_imager.services.shooting import (
@@ -31,17 +26,13 @@ from qu_imager.services.shooting import (
     record_shot,
 )
 
+from conftest import database
+
 OPENED = date(2024, 9, 16)
 SHOT = datetime(2024, 9, 17, 23, 30)
 CHECKED = datetime(2024, 9, 17, 18, 0)
 ON_FILM = ImagingSystem.from_film(film_system("d7"))
 ON_PLATE = ImagingSystem.from_plate(plate("ip1_hd"))
-
-
-def factory():
-    engine = build_engine()
-    create_schema(engine)
-    return unit_of_work_factory(engine)
 
 
 def prepared(work):
@@ -112,7 +103,7 @@ def a_shot(index=1, evidence=None):
 
 
 def test_a_shot_is_numbered_and_stored():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         result = record_shot(work, job, a_shot())
@@ -121,7 +112,7 @@ def test_a_shot_is_numbered_and_stored():
 
 
 def test_the_numbers_run_on_for_the_job():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         first = record_shot(work, job, a_shot(1))
@@ -131,7 +122,7 @@ def test_the_numbers_run_on_for_the_job():
 
 
 def test_the_same_exposure_twice_on_one_weld_is_refused():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         record_shot(work, job, a_shot(1))
@@ -141,7 +132,7 @@ def test_the_same_exposure_twice_on_one_weld_is_refused():
 
 
 def test_an_inadmissible_shot_is_still_recorded_and_still_numbered():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         result = record_shot(work, job, a_shot(evidence=film_evidence(visible=False)))
@@ -153,7 +144,7 @@ def test_an_inadmissible_shot_is_still_recorded_and_still_numbered():
 
 
 def test_the_density_reading_is_stored_with_the_film():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         result = record_shot(work, job, a_shot())
@@ -164,7 +155,7 @@ def test_the_density_reading_is_stored_with_the_film():
 
 
 def test_a_digital_shot_stores_the_noise_figure_instead():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         result = record_shot(work, job, a_shot(evidence=plate_evidence()))
@@ -175,7 +166,7 @@ def test_a_digital_shot_stores_the_noise_figure_instead():
 
 
 def test_the_verdict_is_computed_here_and_not_handed_in():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         thin = record_shot(work, job, a_shot(evidence=film_evidence(density="1.40")))
@@ -184,7 +175,7 @@ def test_the_verdict_is_computed_here_and_not_handed_in():
 
 
 def test_a_shot_against_a_weld_that_is_not_there_is_refused():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         job = prepared(work)
         record_shot(
@@ -201,7 +192,7 @@ def test_a_shot_against_a_weld_that_is_not_there_is_refused():
 
 
 def test_a_shot_against_a_job_that_is_not_there_is_refused():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         prepared(work)
         record_shot(work, JobNumber(24, 99), a_shot())
@@ -221,7 +212,7 @@ def test_a_shot_needs_an_exposure_number_and_a_technique():
 
 
 def test_the_exposures_recorded_so_far_come_back_in_order():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         record_shot(work, job, a_shot(3))
@@ -230,7 +221,7 @@ def test_the_exposures_recorded_so_far_come_back_in_order():
 
 
 def test_the_missing_exposures_are_the_gaps_up_to_the_expected_count():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         job = prepared(work)
         record_shot(work, job, a_shot(1))
@@ -240,7 +231,7 @@ def test_the_missing_exposures_are_the_gaps_up_to_the_expected_count():
 
 
 def test_an_expected_count_of_nothing_is_refused():
-    made = factory()
+    made = database()
     with pytest.raises(ValidationError), transaction(made) as work:
         job = prepared(work)
         missing_exposures(work, job, WeldId.parse("GW-104"), 0)

@@ -8,12 +8,7 @@ from qu_imager.geometry import pipe_schedule as ps
 from qu_imager.identity import JobNumber, WeldId
 from qu_imager.materials import STEEL
 from qu_imager.persistence.models import RadiographRow
-from qu_imager.persistence.unit_of_work import (
-    build_engine,
-    create_schema,
-    transaction,
-    unit_of_work_factory,
-)
+from qu_imager.persistence.unit_of_work import transaction
 from qu_imager.quantities.length import mm
 from qu_imager.services.jobs import (
     NewJob,
@@ -24,13 +19,9 @@ from qu_imager.services.jobs import (
     outstanding,
 )
 
+from conftest import database
+
 OPENED = date(2024, 9, 9)
-
-
-def factory():
-    engine = build_engine()
-    create_schema(engine)
-    return unit_of_work_factory(engine)
 
 
 def a_job(client="Maritime Pipelines"):
@@ -67,14 +58,14 @@ def film(number="R-001", index=1, admissible=True, read=True):
 
 
 def test_a_job_gets_the_next_serial_for_its_year():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         assert open_job(work, a_job()) == JobNumber(24, 1)
         assert open_job(work, a_job("Other")) == JobNumber(24, 2)
 
 
 def test_the_serial_survives_a_new_transaction():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         open_job(work, a_job())
     with transaction(made) as work:
@@ -82,7 +73,7 @@ def test_the_serial_survives_a_new_transaction():
 
 
 def test_a_job_that_rolled_back_does_not_burn_its_serial():
-    made = factory()
+    made = database()
     with pytest.raises(RuntimeError), transaction(made) as work:
         open_job(work, a_job())
         raise RuntimeError("no")
@@ -104,7 +95,7 @@ def test_a_job_needs_a_client_a_site_and_a_procedure():
 
 
 def test_a_weld_goes_onto_an_open_job():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
@@ -114,7 +105,7 @@ def test_a_weld_goes_onto_an_open_job():
 
 
 def test_the_same_weld_twice_is_refused():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
@@ -123,7 +114,7 @@ def test_the_same_weld_twice_is_refused():
 
 
 def test_a_repair_round_is_a_different_weld_as_far_as_adding_goes():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld("GW-104"))
@@ -145,20 +136,20 @@ def test_a_weld_needs_a_welder_and_a_length():
 
 
 def test_a_weld_cannot_be_added_to_a_job_that_does_not_exist():
-    made = factory()
+    made = database()
     with pytest.raises(NotFoundError), transaction(made) as work:
         add_weld(work, JobNumber(24, 99), a_weld())
 
 
 def test_an_empty_job_is_outstanding_on_having_no_welds():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         assert "the job has no welds on it" in outstanding(work, number)
 
 
 def test_a_weld_with_no_radiographs_is_outstanding():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
@@ -166,7 +157,7 @@ def test_a_weld_with_no_radiographs_is_outstanding():
 
 
 def test_an_unread_or_inadmissible_film_keeps_the_job_open():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
@@ -180,7 +171,7 @@ def test_an_unread_or_inadmissible_film_keeps_the_job_open():
 
 
 def test_a_finished_job_closes():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
@@ -192,7 +183,7 @@ def test_a_finished_job_closes():
 
 
 def test_an_unfinished_job_refuses_to_close_and_says_how_many():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
@@ -202,7 +193,7 @@ def test_an_unfinished_job_refuses_to_close_and_says_how_many():
 
 
 def test_a_job_cannot_close_twice_or_before_it_opened():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
@@ -216,7 +207,7 @@ def test_a_job_cannot_close_twice_or_before_it_opened():
 
 
 def test_a_weld_cannot_be_added_to_a_closed_job():
-    made = factory()
+    made = database()
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
