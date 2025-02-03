@@ -126,3 +126,34 @@ def test_the_count_finds_the_worst_position_too():
 def test_the_window_prints_the_way_the_report_reads():
     found = worst_window((slag(at=100, length=20),), mm(1000))
     assert "20.0 mm in the 305 mm from" in found.describe()
+
+
+def test_two_indications_on_the_same_stretch_are_counted_once():
+    doubled = (slag(at=100, length=40), slag(at=100, length=40))
+    total, count = aggregate_in(doubled, mm(0), mm(400))
+    assert total == mm(40)
+    assert count == 2
+
+
+def test_partly_overlapping_indications_count_the_stretch_they_cover():
+    overlapping = (slag(at=100, length=40), slag(at=120, length=40))
+    total, _count = aggregate_in(overlapping, mm(0), mm(400))
+    assert total == mm(60)
+
+
+def test_the_aggregate_never_exceeds_the_window_it_sits_in():
+    piled = tuple(slag(at=0, length=400) for _ in range(4))
+    found = worst_window(piled, mm(1000))
+    assert found.aggregate <= found.length
+
+
+def test_touching_indications_are_not_double_counted_at_the_join():
+    touching = (slag(at=100, length=20), slag(at=120, length=20))
+    total, _count = aggregate_in(touching, mm(0), mm(400))
+    assert total == mm(40)
+
+
+def test_indications_that_do_not_touch_still_add_up():
+    apart = (slag(at=100, length=20), slag(at=200, length=20))
+    total, _count = aggregate_in(apart, mm(0), mm(400))
+    assert total == mm(40)

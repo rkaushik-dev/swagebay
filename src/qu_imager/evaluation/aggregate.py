@@ -67,17 +67,43 @@ def clipped_length(indication: Indication, start: Length, end: Length) -> Length
 def aggregate_in(
     indications: tuple[Indication, ...], start: Length, end: Length
 ) -> tuple[Length, int]:
-    """The total clipped length inside one window, and how many contributed."""
+    """The total clipped length inside one window, and how many contributed.
+
+    Overlapping indications are merged before the lengths are added. Two
+    readers marking the same slag line, or one indication recorded twice from
+    two films that both cover the joint, would otherwise be counted twice and
+    the aggregate could come out longer than the window it sits in. What the
+    code says is the length of weld affected, which is what somebody with a
+    rule against the film would measure.
+    """
     if end <= start:
         raise ValidationError("a window has a positive width")
-    total = Length.ZERO
+    spans: list[tuple[int, int]] = []
     count = 0
     for indication in indications:
         inside = clipped_length(indication, start, end)
-        if inside.um > 0:
-            total = total + inside
-            count += 1
-    return total, count
+        if inside.um <= 0:
+            continue
+        count += 1
+        low = max(indication.starts_at.um, start.um)
+        spans.append((low, low + inside.um))
+    return Length(_union_length(spans)), count
+
+
+def _union_length(spans: list[tuple[int, int]]) -> int:
+    """The length the spans cover between them, counting overlap once."""
+    if not spans:
+        return 0
+    total = 0
+    reach = None
+    for low, high in sorted(spans):
+        if reach is None or low > reach:
+            total += high - low
+            reach = high
+        elif high > reach:
+            total += high - reach
+            reach = high
+    return total
 
 
 def worst_window(
