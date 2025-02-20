@@ -178,3 +178,122 @@ def test_a_job_walks_from_open_to_closed():
     with transaction(made) as work:
         assert assemble(work, job).closed_on == date(2025, 2, 20)
         assert ASSAY.replace(tzinfo=UTC).date() == date(2025, 2, 1)
+
+
+def prepared(made):
+    """A job with a fit source and one weld on it, which is where the night starts."""
+    with transaction(made) as work:
+        register_source(work, a_source())
+        register_device(work, "880D-221", "880d")
+        record_wipe(work, "IR-5512", ASSAY, Decimal(0), "rp")
+        job = open_job(
+            work,
+            NewJob(
+                client="c",
+                site="s",
+                code=Code.API_1104,
+                procedure_number="RT-001",
+                opened_on=OPENED,
+            ),
+        )
+        add_weld(work, job, a_weld())
+    return job
+
+
+def test_an_inadmissible_film_blocks_the_job_until_it_is_reshot():
+    made = database()
+    job = prepared(made)
+
+    with transaction(made) as work:
+        bad = record_shot(
+            work,
+            job,
+            ShotRecord(
+                weld=WELD,
+                exposure_index=1,
+                exposed_at=SHOT,
+                technique_reference="RT-001 rev 1",
+                evidence=film_evidence(visible=False, at=SHOT),
+            ),
+        )
+        assert bad.needs_reshooting
+
+    with transaction(made) as work:
+        pending = outstanding(work, job)
+        assert f"{bad.number} is not admissible" in pending
+        assert weld_verdict(work, job, WELD) is None
+        assert not assemble(work, job).is_complete
+
+    with transaction(made) as work:
+        chains = broken_chains(work, job.year, job.serial)
+        assert len(chains) == 1
+        assert any("admissible" in link.name for link in chains[0].broken())
+
+    with transaction(made) as work:
+        good = record_shot(
+            work,
+            job,
+            ShotRecord(
+                weld=WELD,
+                exposure_index=2,
+                exposed_at=SHOT + timedelta(hours=1),
+                technique_reference="RT-001 rev 1",
+                evidence=film_evidence(at=SHOT),
+            ),
+        )
+        record_reading(work, ReadingRecord(good.number, a_reader(), READ))
+
+    with transaction(made) as work:
+        assert f"{bad.number} is not admissible" in outstanding(work, job)
+        assert weld_verdict(work, job, WELD) is None
+
+
+def test_a_job_will_not_close_while_anything_is_outstanding():
+    import pytest
+
+    from qu_imager.errors import ConflictError
+
+    made = database()
+    job = prepared(made)
+
+    with transaction(made) as work, pytest.raises(ConflictError) as caught:
+        close_job(work, job, date(2025, 2, 20))
+    assert caught.value.context["outstanding"] >= 1
+
+    with transaction(made) as work:
+        number = record_shot(
+            work,
+            job,
+            ShotRecord(
+                weld=WELD,
+                exposure_index=1,
+                exposed_at=SHOT,
+                technique_reference="RT-001 rev 1",
+                evidence=film_evidence(at=SHOT),
+            ),
+        ).number
+
+    with transaction(made) as work, pytest.raises(ConflictError):
+        close_job(work, job, date(2025, 2, 20))
+
+    with transaction(made) as work:
+        record_reading(work, ReadingRecord(number, a_reader(), READ))
+        assert outstanding(work, job) == ()
+        close_job(work, job, date(2025, 2, 20))
+
+
+def test_a_source_that_went_out_and_came_back_reads_as_the_shop_again():
+    made = database()
+    job = prepared(made)
+
+    with transaction(made) as work:
+        send_out(work, Booking("IR-5512", "880D-221", "0142", "site", date(2025, 2, 12)))
+        assert work.sources.open_trip("IR-5512") is not None
+
+    with transaction(made) as work:
+        bring_back(work, "IR-5512", date(2025, 2, 13), exposures=8)
+        assert work.sources.open_trip("IR-5512") is None
+        trip = work.sources.get("IR-5512").trips[0]
+        assert trip.exposures == 8
+        assert trip.came_back == date(2025, 2, 13)
+        assert job.serial == 1
