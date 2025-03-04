@@ -175,7 +175,8 @@ def test_a_finished_job_closes():
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
-        work.jobs.get(number).welds[0].radiographs.append(film())
+        job = work.jobs.get(number)
+        job.welds[0].radiographs.append(film())
         work.flush()
         assert outstanding(work, number) == ()
         close_job(work, number, date(2024, 9, 20))
@@ -197,7 +198,8 @@ def test_a_job_cannot_close_twice_or_before_it_opened():
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
-        work.jobs.get(number).welds[0].radiographs.append(film())
+        job = work.jobs.get(number)
+        job.welds[0].radiographs.append(film())
         work.flush()
         with pytest.raises(ValidationError):
             close_job(work, number, date(2024, 1, 1))
@@ -211,7 +213,8 @@ def test_a_weld_cannot_be_added_to_a_closed_job():
     with transaction(made) as work:
         number = open_job(work, a_job())
         add_weld(work, number, a_weld())
-        work.jobs.get(number).welds[0].radiographs.append(film())
+        job = work.jobs.get(number)
+        job.welds[0].radiographs.append(film())
         work.flush()
         close_job(work, number, date(2024, 9, 20))
         with pytest.raises(ConflictError):
