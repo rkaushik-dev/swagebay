@@ -24,7 +24,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from qu_imager.errors import NotFoundError
+from qu_imager.errors import NotFoundError, ValidationError
 from qu_imager.identity import JobNumber, WeldId
 from qu_imager.persistence.models.sources import DeviceRow, SourceRow, TripRow
 from qu_imager.persistence.models.work import JobRow, RadiographRow, WeldRow
@@ -168,6 +168,28 @@ class WeldRepository:
                 .order_by(RadiographRow.number)
             ).all()
         )
+
+    def radiographs_after(
+        self, job: JobRow, cursor: str | None, limit: int
+    ) -> tuple[RadiographRow, ...]:
+        """One page of a job's radiographs, anchored on the number the client saw.
+
+        The number is unique across the shop, so it is a sound cursor on its
+        own and no tie break column is needed. That is the only reason the
+        cursor can be the number rather than an opaque token.
+        """
+        if limit < 1:
+            raise ValidationError("a page holds at least one row", limit=limit)
+        statement = (
+            select(RadiographRow)
+            .join(WeldRow)
+            .where(WeldRow.job_id == job.id)
+            .order_by(RadiographRow.number)
+            .limit(limit)
+        )
+        if cursor is not None:
+            statement = statement.where(RadiographRow.number > cursor)
+        return tuple(self.session.scalars(statement).all())
 
     def inadmissible(self, job: JobRow) -> tuple[RadiographRow, ...]:
         return tuple(

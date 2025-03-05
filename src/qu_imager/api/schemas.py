@@ -447,3 +447,13 @@ class PackageOut(BaseModel):
     repair_rate: Decimal
     radiographs: int
     welds: tuple[WeldSummaryOut, ...]
+
+
+class RadiographPageOut(BaseModel):
+    """One page of radiographs, with where the next one starts."""
+
+    model_config = ConfigDict(frozen=True)
+
+    items: tuple[RadiographOut, ...]
+    next_cursor: str | None
+    last: bool

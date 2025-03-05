@@ -19,19 +19,22 @@ from datetime import date
 from fastapi import APIRouter, status
 
 from qu_imager.api.app import Work
+from qu_imager.api.paging import after, fetch_size, paginate
 from qu_imager.api.schemas import (
     JobOut,
     LengthOut,
     NewJobIn,
     NewWeldIn,
     OutstandingOut,
+    RadiographOut,
+    RadiographPageOut,
     WeldOut,
 )
 from qu_imager.geometry.joint import Joint, JointForm
 from qu_imager.identity import JobNumber, WeldId
 from qu_imager.materials import material
 from qu_imager.naming import code_named
-from qu_imager.persistence.models.work import JobRow, WeldRow
+from qu_imager.persistence.models.work import JobRow, RadiographRow, WeldRow
 from qu_imager.quantities.length import Length
 from qu_imager.services.jobs import NewJob, NewWeld, add_weld, close_job, open_job, outstanding
 
@@ -87,6 +90,23 @@ def list_welds(number: str, work: Work) -> list[WeldOut]:
     return [_weld_out(row) for row in sorted(job.welds, key=lambda w: (w.number, w.repair_round))]
 
 
+@router.get("/{number}/radiographs")
+def list_radiographs(
+    number: str,
+    work: Work,
+    cursor: str | None = None,
+    size: int | None = None,
+) -> RadiographPageOut:
+    job = work.jobs.get(JobNumber.parse(number))
+    rows = list(work.welds.radiographs_after(job, after(cursor), fetch_size(size)))
+    page = paginate(rows, key=lambda row: row.number, size=size)
+    return RadiographPageOut(
+        items=tuple(_radiograph_out(row) for row in page.items),
+        next_cursor=page.next_cursor,
+        last=page.is_last,
+    )
+
+
 @router.get("/{number}/outstanding")
 def read_outstanding(number: str, work: Work) -> OutstandingOut:
     job = JobNumber.parse(number)
@@ -138,4 +158,21 @@ def _weld_out(row: WeldRow) -> WeldOut:
         welder=row.welder,
         welded_on=row.welded_on,
         radiographs=len(row.radiographs),
+    )
+
+
+def _radiograph_out(row: RadiographRow) -> RadiographOut:
+    weld = row.weld
+    return RadiographOut(
+        number=row.number,
+        weld=str(WeldId(weld.prefix, weld.number, weld.repair_round)),
+        exposure_index=row.exposure_index,
+        exposed_at=row.exposed_at,
+        technique_reference=row.technique_reference,
+        medium=row.medium,
+        admissible=row.admissible,
+        inadmissible_reason=row.inadmissible_reason,
+        read_by=row.read_by,
+        read_at=row.read_at,
+        indications=len(row.indications),
     )
