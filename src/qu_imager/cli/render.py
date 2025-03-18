@@ -16,6 +16,7 @@ a long site name in it wraps, and a wrapped table is worse than an ugly one.
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from decimal import Decimal
 
 from qu_imager.errors import ValidationError
 
@@ -74,3 +75,17 @@ def heading(text: str) -> str:
 
 def yes_no(value: bool) -> str:
     return "yes" if value else "no"
+
+
+def plain(value: Decimal) -> str:
+    """A decimal with the trailing zeros gone and no exponent.
+
+    Decimal.normalize turns a hundred into 1E+2, which is correct and is not
+    what anybody wants on a wall chart. Removing the exponent afterwards is the
+    documented way round it and it is short enough not to be worth a library.
+    """
+    trimmed = value.normalize()
+    sign, digits, exponent = trimmed.as_tuple()
+    if isinstance(exponent, int) and exponent > 0:
+        trimmed = trimmed.quantize(Decimal(1))
+    return f"{trimmed}"

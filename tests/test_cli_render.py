@@ -75,3 +75,31 @@ def test_a_heading_is_underlined_to_its_own_width():
 def test_yes_and_no_are_words_rather_than_symbols():
     assert yes_no(True) == "yes"
     assert yes_no(False) == "no"
+
+
+def test_a_round_number_prints_without_an_exponent():
+    from decimal import Decimal
+
+    from qu_imager.cli.render import plain
+
+    assert plain(Decimal(100)) == "100"
+    assert plain(Decimal("2E+2")) == "200"
+    assert plain(Decimal(1000)) == "1000"
+
+
+def test_trailing_zeros_are_still_trimmed():
+    from decimal import Decimal
+
+    from qu_imager.cli.render import plain
+
+    assert plain(Decimal("2.500")) == "2.5"
+    assert plain(Decimal("0.0240")) == "0.024"
+
+
+def test_a_small_number_keeps_its_places():
+    from decimal import Decimal
+
+    from qu_imager.cli.render import plain
+
+    assert plain(Decimal("0.06")) == "0.06"
+    assert plain(Decimal("1.6")) == "1.6"

@@ -17,7 +17,7 @@ from decimal import Decimal
 import click
 
 from qu_imager.cli.main import cli
-from qu_imager.cli.render import table
+from qu_imager.cli.render import plain, table
 from qu_imager.quantities.activity import Activity
 from qu_imager.quantities.length import Length
 from qu_imager.safety.field import BoundaryKind, RadiationField, rope_off
@@ -101,8 +101,8 @@ def collimators_command(ctx: click.Context) -> None:
             key,
             collimator(key).material,
             f"{collimator(key).aperture_degrees}",
-            f"{collimator(key).transmission.normalize()}",
-            f"{collimator(key).mass_kg.normalize()}",
+            plain(collimator(key).transmission),
+            plain(collimator(key).mass_kg),
         ]
         for key in known_collimators()
     ]
