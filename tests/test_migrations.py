@@ -128,3 +128,45 @@ def test_the_config_file_is_where_the_tests_think_it_is():
     assert (ROOT / "migrations" / "env.py").exists()
     with pytest.raises(FileNotFoundError):
         (ROOT / "migrations" / "nothing.py").read_text(encoding="utf-8")
+
+
+def test_the_hot_lookups_are_indexed(tmp_path):
+    engine = upgraded(tmp_path)
+    inspector = inspect(engine)
+    wanted = {
+        "radiograph": {"ix_radiograph_exposed_at", "ix_radiograph_read_at"},
+        "survey": {"ix_survey_radiograph_number", "ix_survey_performed_at"},
+        "dose_entry": {"ix_dose_entry_badge_year"},
+        "weld": {"ix_weld_job_id"},
+        "trip": {"ix_trip_source_id_came_back"},
+        "indication": {"ix_indication_radiograph_id"},
+    }
+    for table, expected in wanted.items():
+        found = {index["name"] for index in inspector.get_indexes(table)}
+        assert expected <= found, table
+
+
+def test_the_indexes_come_off_again_on_a_downgrade(tmp_path):
+    from alembic import command
+
+    url = f"sqlite:///{tmp_path / 'indexes.sqlite3'}"
+    config = alembic_config(url)
+    command.upgrade(config, "head")
+    command.downgrade(config, "base")
+    engine = build_engine(url)
+    assert set(inspect(engine).get_table_names()) - {"alembic_version"} == set()
+
+
+def test_there_is_more_than_one_revision_now():
+    scripts = ScriptDirectory(str(ROOT / "migrations"))
+    assert len(list(scripts.walk_revisions())) >= 2
+    assert len(scripts.get_heads()) == 1
+
+
+def test_every_index_the_models_declare_reaches_the_database(tmp_path):
+    engine = upgraded(tmp_path)
+    inspector = inspect(engine)
+    for table in Base.metadata.tables.values():
+        declared = {index.name for index in table.indexes}
+        built = {index["name"] for index in inspector.get_indexes(table.name)}
+        assert declared <= built, table.name

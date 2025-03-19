@@ -22,6 +22,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
@@ -98,6 +99,7 @@ class TripRow(Keyed, Base):
 
     __tablename__ = "trip"
     __table_args__ = (
+        Index("ix_trip_source_id_came_back", "source_id", "came_back"),
         CheckConstraint("exposures >= 0", name="exposures_not_negative"),
         CheckConstraint(
             "came_back IS NULL OR came_back >= went_out", name="return_after_departure"

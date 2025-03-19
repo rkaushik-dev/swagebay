@@ -24,6 +24,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     String,
     UniqueConstraint,
 )
@@ -39,7 +40,13 @@ class SurveyRow(Keyed, Base):
     """One walk round with a meter."""
 
     __tablename__ = "survey"
-    __table_args__ = (CheckConstraint("stage IN ('before', 'after')", name="stage_known"),)
+    __table_args__ = (
+        CheckConstraint("stage IN ('before', 'after')", name="stage_known"),
+        # Both survey lookups key on the radiograph and the day log keys on
+        # the time. Neither had an index and both were table scans.
+        Index("ix_survey_radiograph_number", "radiograph_number"),
+        Index("ix_survey_performed_at", "performed_at"),
+    )
 
     radiograph_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
     stage: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -73,7 +80,10 @@ class DoseEntryRow(Keyed, Base):
     """One dose taken by one person, appended and never corrected in place."""
 
     __tablename__ = "dose_entry"
-    __table_args__ = (CheckConstraint("taken >= 0", name="dose_not_negative"),)
+    __table_args__ = (
+        CheckConstraint("taken >= 0", name="dose_not_negative"),
+        Index("ix_dose_entry_badge_year", "badge", "year"),
+    )
 
     badge: Mapped[str] = mapped_column(String(20), nullable=False)
     year: Mapped[int] = mapped_column(nullable=False)

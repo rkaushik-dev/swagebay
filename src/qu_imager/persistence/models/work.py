@@ -25,6 +25,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
@@ -64,6 +65,7 @@ class WeldRow(Keyed, Base):
     __tablename__ = "weld"
     __table_args__ = (
         UniqueConstraint("job_id", "prefix", "number", "repair_round"),
+        Index("ix_weld_job_id", "job_id"),
         CheckConstraint("repair_round >= 0", name="repair_round_not_negative"),
         CheckConstraint("wall > 0", name="wall_positive"),
         CheckConstraint("weld_length > 0", name="weld_length_positive"),
@@ -95,6 +97,12 @@ class RadiographRow(Keyed, Base):
         UniqueConstraint("number"),
         UniqueConstraint("weld_id", "exposure_index"),
         CheckConstraint("exposure_index >= 1", name="exposure_from_one"),
+        # The day log asks for every exposure on a date across every job, and
+        # the unread listing asks for the ones with no reader. Both scanned the
+        # whole table before these existed, which was fine at four hundred rows
+        # and was not at forty thousand.
+        Index("ix_radiograph_exposed_at", "exposed_at"),
+        Index("ix_radiograph_read_at", "read_at"),
     )
 
     weld_id: Mapped[int] = mapped_column(ForeignKey("weld.id"), nullable=False)
@@ -121,6 +129,7 @@ class IndicationRow(Keyed, Base):
 
     __tablename__ = "indication"
     __table_args__ = (
+        Index("ix_indication_radiograph_id", "radiograph_id"),
         CheckConstraint("starts_at >= 0", name="starts_on_the_weld"),
         CheckConstraint("length >= 0", name="length_not_negative"),
         CheckConstraint("width >= 0", name="width_not_negative"),
