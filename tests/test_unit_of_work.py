@@ -153,3 +153,76 @@ def test_a_second_unit_of_work_sees_the_first_one_committed():
         first.sources.add(source_row())
     with transaction(made) as second:
         assert second.sources.get("IR-5512").serial == "IR-5512"
+
+
+REGISTERS = ("incidents", "calibrations", "stock", "archive", "qualifications")
+
+
+def test_every_register_is_on_the_unit_of_work():
+    made = database()
+    with transaction(made) as work:
+        for name in REGISTERS:
+            assert getattr(work, name) is not None
+
+
+def test_every_register_shares_the_one_session():
+    made = database()
+    with transaction(made) as work:
+        for name in REGISTERS:
+            assert getattr(work, name).session is work.session
+
+
+def test_every_register_refuses_once_the_block_is_left():
+    work = UnitOfWork(database())
+    with work:
+        assert work.incidents is not None
+    for name in REGISTERS:
+        with pytest.raises(ConflictError):
+            getattr(work, name)
+
+
+def test_a_register_write_commits_with_the_rest_of_the_work():
+    from datetime import datetime
+
+    from qu_imager.persistence.models import IncidentRow
+
+    made = database()
+    moment = datetime(2025, 3, 31, 23, 0)
+    with transaction(made) as work:
+        work.session.add(
+            IncidentRow(
+                reference="INC-1",
+                occurrence="dose over a limit",
+                discovered_at=moment,
+                site="site",
+                reported_by="0142",
+                account="a",
+            )
+        )
+        work.jobs.add(job_row())
+    with transaction(made) as work:
+        assert work.incidents.get("INC-1").site == "site"
+        assert work.jobs.find(JobNumber(24, 417)) is not None
+
+
+def test_a_register_write_rolls_back_with_the_rest_of_the_work():
+    from datetime import datetime
+
+    from qu_imager.persistence.models import IncidentRow
+
+    made = database()
+    with pytest.raises(RuntimeError), transaction(made) as work:
+        work.session.add(
+            IncidentRow(
+                reference="INC-2",
+                occurrence="dose over a limit",
+                discovered_at=datetime(2025, 3, 31, 23, 0),
+                site="site",
+                reported_by="0142",
+                account="a",
+            )
+        )
+        work.flush()
+        raise RuntimeError("no")
+    with transaction(made) as work:
+        assert work.incidents.find("INC-2") is None

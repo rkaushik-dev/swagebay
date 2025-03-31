@@ -31,6 +31,13 @@ from sqlalchemy.pool import StaticPool
 from qu_imager.errors import ConflictError
 from qu_imager.persistence.base import Base
 from qu_imager.persistence.numbering import Numbering
+from qu_imager.persistence.register_repositories import (
+    ArchiveRepository,
+    CalibrationRepository,
+    IncidentRepository,
+    QualificationRepository,
+    StockRepository,
+)
 from qu_imager.persistence.repositories import (
     JobRepository,
     SourceRepository,
@@ -79,6 +86,11 @@ class UnitOfWork:
         self._jobs: JobRepository | None = None
         self._welds: WeldRepository | None = None
         self._numbering: Numbering | None = None
+        self._incidents: IncidentRepository | None = None
+        self._calibrations: CalibrationRepository | None = None
+        self._stock: StockRepository | None = None
+        self._archive: ArchiveRepository | None = None
+        self._qualifications: QualificationRepository | None = None
 
     def __enter__(self) -> UnitOfWork:
         self._session = self._factory()
@@ -86,6 +98,11 @@ class UnitOfWork:
         self._jobs = JobRepository(self._session)
         self._welds = WeldRepository(self._session)
         self._numbering = Numbering(self._session)
+        self._incidents = IncidentRepository(self._session)
+        self._calibrations = CalibrationRepository(self._session)
+        self._stock = StockRepository(self._session)
+        self._archive = ArchiveRepository(self._session)
+        self._qualifications = QualificationRepository(self._session)
         return self
 
     @property
@@ -130,6 +147,36 @@ class UnitOfWork:
             raise ConflictError("this unit of work is not open")
         return self._numbering
 
+    @property
+    def incidents(self) -> IncidentRepository:
+        if self._incidents is None:
+            raise ConflictError("this unit of work is not open")
+        return self._incidents
+
+    @property
+    def calibrations(self) -> CalibrationRepository:
+        if self._calibrations is None:
+            raise ConflictError("this unit of work is not open")
+        return self._calibrations
+
+    @property
+    def stock(self) -> StockRepository:
+        if self._stock is None:
+            raise ConflictError("this unit of work is not open")
+        return self._stock
+
+    @property
+    def archive(self) -> ArchiveRepository:
+        if self._archive is None:
+            raise ConflictError("this unit of work is not open")
+        return self._archive
+
+    @property
+    def qualifications(self) -> QualificationRepository:
+        if self._qualifications is None:
+            raise ConflictError("this unit of work is not open")
+        return self._qualifications
+
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
@@ -147,6 +194,11 @@ class UnitOfWork:
             self._jobs = None
             self._welds = None
             self._numbering = None
+            self._incidents = None
+            self._calibrations = None
+            self._stock = None
+            self._archive = None
+            self._qualifications = None
 
     def commit(self) -> None:
         self.session.commit()
