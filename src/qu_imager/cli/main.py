@@ -108,6 +108,7 @@ def load_commands() -> None:
     from qu_imager.cli import (  # noqa: F401
         catalogue,
         jobs,
+        registers,
         reports,
         safety,
         sources,
