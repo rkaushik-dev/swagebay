@@ -82,6 +82,7 @@ def _install_routers(app: FastAPI) -> None:
     from qu_imager.api.routes import (
         jobs,
         radiographs,
+        registers,
         reports,
         safety,
         sources,
@@ -94,3 +95,4 @@ def _install_routers(app: FastAPI) -> None:
     app.include_router(radiographs.router)
     app.include_router(safety.router)
     app.include_router(reports.router)
+    app.include_router(registers.router)

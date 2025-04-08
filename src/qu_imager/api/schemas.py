@@ -457,3 +457,54 @@ class RadiographPageOut(BaseModel):
     items: tuple[RadiographOut, ...]
     next_cursor: str | None
     last: bool
+
+
+class IncidentIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    reference: str = Field(min_length=1, max_length=40)
+    occurrence: str = Field(min_length=1, max_length=60)
+    discovered_at: datetime
+    site: str = Field(min_length=1, max_length=120)
+    reported_by: str = Field(min_length=1, max_length=40)
+    account: str = Field(min_length=1, max_length=2000)
+
+
+class IncidentOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    reference: str
+    occurrence: str
+    discovered_at: datetime
+    due_at: datetime
+    site: str
+    notified_at: datetime | None
+    late: bool
+
+
+class InstrumentCalibrationIn(BaseModel):
+    """A calibration certificate against one instrument.
+
+    Named for the instrument rather than just Calibration, because the
+    densitometer check the shot endpoint takes is also a calibration and the
+    two were briefly the same name in one file.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    serial: str = Field(min_length=1, max_length=40)
+    instrument: str = Field(min_length=1, max_length=40)
+    calibrated_on: date
+    due_on: date
+    laboratory: str = Field(min_length=1, max_length=120)
+    certificate: str = Field(default="", max_length=60)
+
+
+class CalibrationOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    serial: str
+    instrument: str
+    calibrated_on: date
+    due_on: date
+    laboratory: str
