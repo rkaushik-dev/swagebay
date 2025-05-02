@@ -23,6 +23,7 @@ from datetime import date, datetime
 
 from sqlalchemy import select
 
+from qu_imager.clock import end_of, start_of
 from qu_imager.errors import ConflictError, ValidationError
 from qu_imager.persistence.models.safety import SurveyRow
 from qu_imager.persistence.models.work import RadiographRow, WeldRow
@@ -89,8 +90,7 @@ class DayLog:
 
 def shots_on(work: UnitOfWork, day: date) -> tuple[RadiographRow, ...]:
     """Every exposure made that day, whatever job it was on."""
-    start = datetime.combine(day, datetime.min.time())
-    end = datetime.combine(day, datetime.max.time())
+    start, end = start_of(day), end_of(day)
     return tuple(
         work.session.scalars(
             select(RadiographRow)
@@ -101,8 +101,7 @@ def shots_on(work: UnitOfWork, day: date) -> tuple[RadiographRow, ...]:
 
 
 def surveys_on(work: UnitOfWork, day: date) -> tuple[SurveyRow, ...]:
-    start = datetime.combine(day, datetime.min.time())
-    end = datetime.combine(day, datetime.max.time())
+    start, end = start_of(day), end_of(day)
     return tuple(
         work.session.scalars(
             select(SurveyRow)

@@ -107,3 +107,91 @@ def test_a_wall_clock_moment_falls_on_a_day_or_it_does_not():
 def test_an_instant_cannot_be_asked_which_wall_clock_day_it_is_on():
     with pytest.raises(ValidationError):
         within(AWARE, date(2025, 4, 14))
+
+
+def test_the_decay_guard_is_the_shared_one_now():
+    from qu_imager.quantities.activity import curie
+    from qu_imager.sources.decay import activity_on
+    from qu_imager.sources.isotope import IR192
+
+    with pytest.raises(ValidationError) as caught:
+        activity_on(curie(100), AWARE, IR192, NAIVE)
+    assert caught.value.context["left_aware"] is True
+    assert caught.value.context["right_aware"] is False
+
+
+def test_a_site_window_refuses_an_instant_through_the_shared_guard():
+    from qu_imager.scheduling import Window
+
+    with pytest.raises(ValidationError) as caught:
+        Window(AWARE, AWARE + timedelta(hours=2))
+    assert "site window" in caught.value.message
+
+
+def test_a_site_window_still_takes_wall_clock_time():
+    from qu_imager.scheduling import Window
+
+    window = Window(NAIVE, NAIVE + timedelta(hours=2))
+    assert window.length.ms == 2 * 3600 * 1000
+
+
+def test_the_day_slice_the_log_uses_is_the_shared_one():
+    from qu_imager.services.daylog import shots_on
+
+    assert callable(shots_on)
+    day = date(2025, 4, 14)
+    assert start_of(day) < end_of(day)
+    assert within(datetime(2025, 4, 14, 12, 0), day)
+
+
+def test_a_decay_between_two_instants_still_works():
+    from qu_imager.quantities.activity import curie
+    from qu_imager.sources.decay import activity_on
+    from qu_imager.sources.isotope import IR192
+
+    later = activity_on(curie(100), AWARE, IR192, AWARE + timedelta(days=74))
+    assert later.curie < curie(100).curie
+
+
+def test_every_module_that_takes_an_instant_says_so_the_same_way():
+    from qu_imager.clock import require_aware
+
+    for what in ("assay", "survey", "reading"):
+        with pytest.raises(ValidationError) as caught:
+            require_aware(NAIVE, what)
+        assert what in caught.value.message
+        assert caught.value.context["given"] == NAIVE.isoformat()
+
+
+def test_every_module_that_takes_wall_clock_says_so_the_same_way():
+    for what in ("site window", "permit", "shift"):
+        with pytest.raises(ValidationError) as caught:
+            require_naive(AWARE, what)
+        assert what in caught.value.message
+
+
+def test_an_offset_at_the_edge_of_the_range_is_allowed():
+    assert at_offset(AWARE, 14).utcoffset() == timedelta(hours=14)
+    assert at_offset(AWARE, -14).utcoffset() == timedelta(hours=-14)
+
+
+def test_a_span_of_no_time_is_allowed():
+    assert span(NAIVE, NAIVE) == timedelta(0)
+    assert span(AWARE, AWARE) == timedelta(0)
+
+
+def test_a_half_hour_zone_survives_the_round_trip():
+    local = AWARE.astimezone(NEWFOUNDLAND)
+    assert local.utcoffset() == timedelta(hours=-3, minutes=-30)
+    assert to_utc(local) == AWARE
+
+
+def test_the_universal_day_of_an_instant_does_not_move_with_the_zone_it_is_read_in():
+    local = AWARE.astimezone(NEWFOUNDLAND)
+    assert utc_day(local) == utc_day(AWARE)
+
+
+def test_the_end_of_a_day_is_inside_it_and_the_next_midnight_is_not():
+    day = date(2025, 4, 14)
+    assert within(end_of(day), day)
+    assert not within(start_of(date(2025, 4, 15)), day)

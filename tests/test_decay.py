@@ -65,8 +65,8 @@ def test_an_aware_certificate_and_a_naive_shot_date_are_refused():
     naive = datetime(2024, 5, 1, 12, 0)
     with pytest.raises(ValidationError) as caught:
         activity_on(curie(100), ASSAY, IR192, naive)
-    assert caught.value.context["assay_aware"] is True
-    assert caught.value.context["at_aware"] is False
+    assert caught.value.context["left_aware"] is True
+    assert caught.value.context["right_aware"] is False
 
 
 def test_the_time_to_fall_to_a_fraction_inverts_the_decay():

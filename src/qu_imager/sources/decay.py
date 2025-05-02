@@ -20,6 +20,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal, localcontext
 
+from qu_imager.clock import same_kind
 from qu_imager.errors import ValidationError
 from qu_imager.quantities.activity import Activity
 from qu_imager.quantities.duration import MS_PER_HOUR, Duration
@@ -51,7 +52,7 @@ def activity_on(
     at: datetime,
 ) -> Activity:
     """The activity on the day of the shot, from the certificate."""
-    _same_awareness(assay_at, at)
+    same_kind(assay_at, at)
     if at < assay_at:
         raise ValidationError(
             "cannot decay a source to a date before its assay",
@@ -98,17 +99,6 @@ def _span(delta: timedelta) -> Duration:
     if total_ms < 0:
         raise ValidationError("a decay span cannot be negative", ms=total_ms)
     return Duration(total_ms)
-
-
-def _same_awareness(left: datetime, right: datetime) -> None:
-    left_aware = left.tzinfo is not None and left.utcoffset() is not None
-    right_aware = right.tzinfo is not None and right.utcoffset() is not None
-    if left_aware != right_aware:
-        raise ValidationError(
-            "cannot compare an aware timestamp with a naive one",
-            assay_aware=left_aware,
-            at_aware=right_aware,
-        )
 
 
 def hours(value: Decimal | int) -> Duration:

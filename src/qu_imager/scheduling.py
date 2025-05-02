@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from enum import Enum
 
+from qu_imager.clock import require_naive
 from qu_imager.errors import ValidationError
 from qu_imager.quantities.duration import Duration
 
@@ -51,8 +52,8 @@ class Window:
     kind: WindowKind = WindowKind.NIGHT
 
     def __post_init__(self) -> None:
-        if self.starts_at.tzinfo is not None or self.ends_at.tzinfo is not None:
-            raise ValidationError("site windows are local wall clock time")
+        require_naive(self.starts_at, "site window")
+        require_naive(self.ends_at, "site window")
         if self.ends_at <= self.starts_at:
             raise ValidationError(
                 "a window has to end after it starts",
