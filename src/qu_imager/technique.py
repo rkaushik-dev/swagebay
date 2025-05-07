@@ -27,7 +27,9 @@ from qu_imager.errors import TechniqueError
 from qu_imager.exposure.calculation import ExposureResult, plan_exposure
 from qu_imager.exposure.catalogue import chart_for
 from qu_imager.exposure.corrections import (
+    Correction,
     CorrectionChain,
+    collimator_correction,
     distance_correction,
     film_correction,
 )
@@ -36,10 +38,13 @@ from qu_imager.geometry.coverage import CoveragePlan, plan_coverage
 from qu_imager.geometry.joint import Joint
 from qu_imager.geometry.shot import ShotType, choose_shot, exposures_required, penetrated_thickness
 from qu_imager.imaging.film import REFERENCE_FILM, FilmSystem
+from qu_imager.imaging.screens import screens_for, wrong_screens
 from qu_imager.imaging.selection import HoleSelection, IndicatorSide, hole_selection
 from qu_imager.imaging.system import ImagingSystem
 from qu_imager.quantities.duration import Duration
 from qu_imager.quantities.length import Length
+from qu_imager.sources.device import Collimator, collimator
+from qu_imager.sources.isotope import Isotope
 from qu_imager.sources.sealed import SealedSource
 
 GUIDE_CLEARANCE = Length.from_mm(5)
@@ -104,6 +109,8 @@ class TechniqueRequest:
     film: FilmSystem
     shot_at: datetime
     shot: ShotType | None = None
+    screens_fitted: bool = True
+    collimator_key: str | None = None
     indicator_side: IndicatorSide = IndicatorSide.SOURCE
     window: Duration | None = None
     density: Decimal = Decimal("2.0")
@@ -161,12 +168,17 @@ def plan_technique(request: TechniqueRequest) -> TechniqueSheet:
         CorrectionChain()
         .with_correction(distance_correction(chart.reference_sfd, sfd))
         .with_correction(film_correction(REFERENCE_FILM, request.film))
+        .with_correction(_screen_correction(request, isotope))
     )
+    if request.collimator_key is not None:
+        cup = collimator(request.collimator_key)
+        chain = chain.with_correction(collimator_correction(_beam_fraction(cup)))
     activity = request.source.activity_at(request.shot_at)
     exposure = plan_exposure(chart, penetrated, chain, activity, request.window)
 
     total = Duration(exposure.exposure.ms * coverage.exposures)
     warnings = _warnings(request, geometry, penetrated, exposure, total)
+    warnings = (*warnings, *screen_faults(request, isotope))
 
     return TechniqueSheet(
         joint=joint,
@@ -215,3 +227,36 @@ def sheet_or_refuse(request: TechniqueRequest) -> TechniqueSheet:
     if not sheet.exposure.corrected_reading:
         raise TechniqueError("the exposure could not be worked out", joint=request.joint.describe())
     return sheet
+
+
+def _screen_correction(request: TechniqueRequest, source: Isotope) -> Correction:
+    """Lead screens shorten the shot, and the pair depends on the beam."""
+    if not request.screens_fitted:
+        return Correction("screens", Decimal(1), "no screens")
+    quality = source.equivalence_quality
+    if quality is None:
+        return Correction("screens", Decimal(1), "no screen pair specified for this isotope")
+    pair = screens_for(quality)
+    return Correction("screens", pair.time_factor, pair.describe())
+
+
+def _beam_fraction(cup: Collimator) -> Decimal:
+    """A collimator clips the beam edge, so a little exposure is lost.
+
+    The transmission on the cup is what leaks through the body of it, which is
+    not the same number. What is lost down the beam is the edge of the cone,
+    and the shop measures it at a few percent per cup rather than deriving it.
+    """
+    lost = Decimal(cup.aperture_degrees) / Decimal(3600)
+    return Decimal(1) - lost
+
+
+def screen_faults(request: TechniqueRequest, source: Isotope) -> tuple[str, ...]:
+    """Whether the pair on the cassette belongs on this shot."""
+    if not request.screens_fitted:
+        return ()
+    quality = source.equivalence_quality
+    if quality is None:
+        return ()
+    note = wrong_screens(screens_for(quality), quality)
+    return (note,) if note is not None else ()

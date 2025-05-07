@@ -66,7 +66,7 @@ def test_a_sheet_comes_back_with_every_number_on_it(api):
     assert body["shot"] == "double wall single image"
     assert body["penetrated"]["mm"] == "25.94"
     assert body["coverage"]["exposures"] == 8
-    assert body["exposure"]["timer"] == "1:34"
+    assert body["exposure"]["timer"] == "0:38"
 
 
 def test_the_planner_picks_the_shot_when_none_is_named(api):

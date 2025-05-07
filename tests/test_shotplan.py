@@ -103,7 +103,7 @@ def test_missing_dosimetry_is_blocked_and_named_by_badge(six_inch_weld, iridium_
 
 
 def test_a_window_too_short_for_the_joint_blocks_it(six_inch_weld, iridium_source, crew, kitted):
-    site = SiteConstraints(clear_radius=Length.from_m(200), window=minutes(5))
+    site = SiteConstraints(clear_radius=Length.from_m(200), window=minutes(2))
     assert any(
         "source out" in b for b in plan(six_inch_weld, iridium_source, crew, kitted, site).blockers
     )
@@ -115,7 +115,7 @@ def test_a_generous_window_does_not_block(six_inch_weld, iridium_source, crew, k
 
 
 def test_every_blocker_is_collected_not_just_the_first(six_inch_weld, iridium_source, crew):
-    site = SiteConstraints(clear_radius=Length.from_m(40), window=minutes(5))
+    site = SiteConstraints(clear_radius=Length.from_m(40), window=minutes(2))
     blocked = plan(six_inch_weld, iridium_source, (crew[1],), (Assignment(badge="0201"),), site)
     assert len(blocked.blockers) >= 6
 

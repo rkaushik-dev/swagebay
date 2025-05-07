@@ -62,7 +62,7 @@ def test_the_same_weld_shot_from_outside_is_a_workable_sheet(six_inch_weld, irid
     sheet = plan_technique(outside(six_inch_weld, iridium_source, on_d7))
     assert sheet.is_clean
     assert sheet.exposures == 8
-    assert sheet.exposure.timer == "1:33"
+    assert sheet.exposure.timer == "0:37"
 
 
 def test_the_outside_shot_crosses_two_walls_and_two_caps(six_inch_weld, iridium_source, on_d7):
@@ -116,7 +116,7 @@ def test_the_total_source_out_is_the_shot_times_the_exposure_count(
 ):
     sheet = plan_technique(outside(six_inch_weld, iridium_source, on_d7))
     assert sheet.total_source_out.ms == sheet.exposure.exposure.ms * sheet.exposures
-    assert sheet.total_source_out.as_timer() == "12:24"
+    assert sheet.total_source_out.as_timer() == "4:56"
 
 
 def test_a_source_with_a_lapsed_leak_test_warns_rather_than_refusing(
@@ -136,7 +136,7 @@ def test_a_spent_source_warns_on_the_working_floor(six_inch_weld, iridium_source
 
 
 def test_a_window_too_short_for_the_joint_is_warned_about(six_inch_weld, iridium_source, on_d7):
-    sheet = plan_technique(outside(six_inch_weld, iridium_source, on_d7, window=minutes(5)))
+    sheet = plan_technique(outside(six_inch_weld, iridium_source, on_d7, window=minutes(2)))
     assert any("source out" in w for w in sheet.warnings)
 
 
@@ -187,3 +187,55 @@ def test_the_sheet_prints_as_one_line_for_the_job_book(six_inch_weld, iridium_so
     assert "girth weld" in text
     assert "double wall single image" in text
     assert "source side" in text
+
+
+def test_screens_shorten_the_shot_and_appear_in_the_chain(six_inch_weld, iridium_source, on_d7):
+    with_screens = plan_technique(outside(six_inch_weld, iridium_source, on_d7))
+    without = plan_technique(outside(six_inch_weld, iridium_source, on_d7, screens_fitted=False))
+    assert with_screens.exposure.exposure < without.exposure.exposure
+    assert "screens" in with_screens.exposure.corrections.names()
+
+
+def test_the_screen_pair_named_on_the_sheet_is_the_one_for_the_beam(
+    six_inch_weld, iridium_source, on_d7
+):
+    sheet = plan_technique(outside(six_inch_weld, iridium_source, on_d7))
+    screens = next(c for c in sheet.exposure.corrections.corrections if c.name == "screens")
+    assert "0.13 mm front" in screens.note
+
+
+def test_no_screens_is_recorded_rather_than_left_out(six_inch_weld, iridium_source, on_d7):
+    sheet = plan_technique(outside(six_inch_weld, iridium_source, on_d7, screens_fitted=False))
+    screens = next(c for c in sheet.exposure.corrections.corrections if c.name == "screens")
+    assert screens.note == "no screens"
+    assert screens.factor == Decimal(1)
+
+
+def test_a_collimator_costs_a_little_exposure(six_inch_weld, iridium_source, on_d7):
+    bare = plan_technique(outside(six_inch_weld, iridium_source, on_d7))
+    cupped = plan_technique(outside(six_inch_weld, iridium_source, on_d7, collimator_key="w60"))
+    assert cupped.exposure.exposure > bare.exposure.exposure
+    assert "collimator" in cupped.exposure.corrections.names()
+
+
+def test_a_tighter_cup_costs_less_than_a_wider_one(six_inch_weld, iridium_source, on_d7):
+    tight = plan_technique(outside(six_inch_weld, iridium_source, on_d7, collimator_key="du45"))
+    wide = plan_technique(outside(six_inch_weld, iridium_source, on_d7, collimator_key="w90"))
+    assert tight.exposure.exposure <= wide.exposure.exposure
+
+
+def test_no_collimator_leaves_the_chain_alone(six_inch_weld, iridium_source, on_d7):
+    sheet = plan_technique(outside(six_inch_weld, iridium_source, on_d7))
+    assert "collimator" not in sheet.exposure.corrections.names()
+
+
+def test_a_collimator_nothing_knows_about_is_refused(six_inch_weld, iridium_source, on_d7):
+    from qu_imager.errors import ConfigurationError
+
+    with pytest.raises(ConfigurationError):
+        plan_technique(outside(six_inch_weld, iridium_source, on_d7, collimator_key="w99"))
+
+
+def test_the_right_pair_for_the_beam_draws_no_warning(six_inch_weld, iridium_source, on_d7):
+    sheet = plan_technique(outside(six_inch_weld, iridium_source, on_d7))
+    assert not any("front lead" in w for w in sheet.warnings)
