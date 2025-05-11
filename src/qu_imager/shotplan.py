@@ -26,6 +26,7 @@ from decimal import Decimal
 
 from qu_imager.errors import ValidationError
 from qu_imager.personnel import Person, interpreters, supervision_satisfied
+from qu_imager.quantities.dose import Dose
 from qu_imager.quantities.duration import Duration
 from qu_imager.quantities.length import Length
 from qu_imager.safety.dosimetry import Assignment
@@ -47,6 +48,18 @@ class SiteConstraints:
 
 
 @dataclass(frozen=True, slots=True)
+class CrewDose:
+    """What the crew is expected to take on this job, and where they stand."""
+
+    badge: str
+    expected: Dose
+    stand_off: Length
+
+    def describe(self) -> str:
+        return f"{self.badge} {self.expected.format_usv()} at {self.stand_off.format_m()}"
+
+
+@dataclass(frozen=True, slots=True)
 class ShotPlan:
     """Everything that has to be true before the source comes out."""
 
@@ -56,6 +69,7 @@ class ShotPlan:
     site: SiteConstraints
     blockers: tuple[str, ...]
     warnings: tuple[str, ...]
+    expected_dose: tuple[CrewDose, ...] = ()
 
     @property
     def can_proceed(self) -> bool:
@@ -94,7 +108,35 @@ def plan_shot(
         site=site,
         blockers=tuple(blockers),
         warnings=sheet.warnings,
+        expected_dose=tuple(
+            expected_dose(radiation_field, sheet, assignment.badge, rope.down_beam)
+            for assignment in assignments
+        ),
     )
+
+
+def expected_dose(
+    radiation_field: RadiationField,
+    sheet: TechniqueSheet,
+    badge: str,
+    stand_off: Length,
+) -> CrewDose:
+    """What somebody standing at the rope takes while the source is out.
+
+    It is a small number and it should be. A crew that expects a measurable
+    dose from standing at the boundary has the boundary in the wrong place,
+    and this exists to make that visible before the shot rather than on the
+    badge report three months later.
+    """
+    if stand_off.um <= 0:
+        raise ValidationError("somebody has to be standing somewhere")
+    rate = radiation_field.rate_at(stand_off, Decimal(0))
+    return CrewDose(badge=badge, expected=rate.over(sheet.total_source_out), stand_off=stand_off)
+
+
+def over_expected(plan: ShotPlan, ceiling: Dose) -> tuple[str, ...]:
+    """Anybody whose expected dose on this job is over a stated ceiling."""
+    return tuple(entry.badge for entry in plan.expected_dose if entry.expected > ceiling)
 
 
 def _room_blockers(rope: RopeOff, site: SiteConstraints) -> list[str]:

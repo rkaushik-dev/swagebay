@@ -153,3 +153,72 @@ def test_no_shortfall_when_the_job_fits(six_inch_weld, iridium_source, crew, kit
     ready = plan(six_inch_weld, iridium_source, crew, kitted)
     assert shortfall(ready.rope, ready.site) == Length.ZERO
     assert ready.rope.down_beam.m - ready.rope.off_beam.m == Decimal(0)
+
+
+def test_the_plan_says_what_the_crew_is_expected_to_take(
+    six_inch_weld, iridium_source, crew, kitted
+):
+    ready = plan(six_inch_weld, iridium_source, crew, kitted)
+    assert len(ready.expected_dose) == len(kitted)
+    assert {entry.badge for entry in ready.expected_dose} == {"0142", "0201"}
+
+
+def test_the_expected_dose_at_the_boundary_is_a_small_number(
+    six_inch_weld, iridium_source, crew, kitted
+):
+    from qu_imager.quantities.dose import usv
+
+    ready = plan(six_inch_weld, iridium_source, crew, kitted)
+    for entry in ready.expected_dose:
+        assert entry.expected < usv(50)
+
+
+def test_standing_closer_takes_more(six_inch_weld, iridium_source, crew, kitted):
+    from qu_imager.quantities.length import Length as L
+    from qu_imager.safety.field import RadiationField
+    from qu_imager.shotplan import expected_dose
+
+    ready = plan(six_inch_weld, iridium_source, crew, kitted)
+    field = RadiationField(IR192, curie(74))
+    near = expected_dose(field, ready.sheet, "0142", L.from_m(20))
+    far = expected_dose(field, ready.sheet, "0142", L.from_m(200))
+    assert near.expected > far.expected
+
+
+def test_a_longer_job_takes_more_at_the_same_distance(six_inch_weld, iridium_source, crew, kitted):
+    from qu_imager.quantities.length import Length as L
+    from qu_imager.safety.field import RadiationField
+    from qu_imager.shotplan import expected_dose
+
+    ready = plan(six_inch_weld, iridium_source, crew, kitted)
+    field = RadiationField(IR192, curie(74))
+    one = expected_dose(field, ready.sheet, "0142", L.from_m(140))
+    assert one.expected.nsv > 0
+
+
+def test_nobody_standing_anywhere_is_refused():
+    from qu_imager.quantities.length import Length as L
+    from qu_imager.safety.field import RadiationField
+    from qu_imager.shotplan import expected_dose
+
+    field = RadiationField(IR192, curie(74))
+    with pytest.raises(ValidationError):
+        expected_dose(field, None, "0142", L.ZERO)
+
+
+def test_a_ceiling_names_who_is_over_it(six_inch_weld, iridium_source, crew, kitted):
+    from qu_imager.quantities.dose import Dose, usv
+    from qu_imager.shotplan import over_expected
+
+    ready = plan(six_inch_weld, iridium_source, crew, kitted)
+    assert over_expected(ready, usv(1000)) == ()
+    assert set(over_expected(ready, Dose(1))) == {"0142", "0201"}
+
+
+def test_the_expected_dose_prints_where_it_was_taken_from(
+    six_inch_weld, iridium_source, crew, kitted
+):
+    ready = plan(six_inch_weld, iridium_source, crew, kitted)
+    text = ready.expected_dose[0].describe()
+    assert "uSv" in text
+    assert " m" in text
