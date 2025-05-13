@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from qu_imager.errors import ConflictError
+from qu_imager.persistence.audit_repository import AuditRepository
 from qu_imager.persistence.base import Base
 from qu_imager.persistence.numbering import Numbering
 from qu_imager.persistence.register_repositories import (
@@ -91,6 +92,7 @@ class UnitOfWork:
         self._stock: StockRepository | None = None
         self._archive: ArchiveRepository | None = None
         self._qualifications: QualificationRepository | None = None
+        self._audit: AuditRepository | None = None
 
     def __enter__(self) -> UnitOfWork:
         self._session = self._factory()
@@ -103,6 +105,7 @@ class UnitOfWork:
         self._stock = StockRepository(self._session)
         self._archive = ArchiveRepository(self._session)
         self._qualifications = QualificationRepository(self._session)
+        self._audit = AuditRepository(self._session)
         return self
 
     @property
@@ -177,6 +180,12 @@ class UnitOfWork:
             raise ConflictError("this unit of work is not open")
         return self._qualifications
 
+    @property
+    def audit(self) -> AuditRepository:
+        if self._audit is None:
+            raise ConflictError("this unit of work is not open")
+        return self._audit
+
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
@@ -199,6 +208,7 @@ class UnitOfWork:
             self._stock = None
             self._archive = None
             self._qualifications = None
+            self._audit = None
 
     def commit(self) -> None:
         self.session.commit()
