@@ -226,3 +226,44 @@ def test_a_register_write_rolls_back_with_the_rest_of_the_work():
         raise RuntimeError("no")
     with transaction(made) as work:
         assert work.incidents.find("INC-2") is None
+
+
+def test_a_repository_reached_before_opening_refuses():
+    work = UnitOfWork(database())
+    for name in ("sources", "jobs", "welds", "numbering", "audit", "stock"):
+        with pytest.raises(ConflictError):
+            getattr(work, name)
+
+
+def test_every_repository_is_built_when_the_block_opens():
+    with UnitOfWork(database()) as work:
+        for name in ("sources", "jobs", "welds", "numbering", "audit", "archive"):
+            assert getattr(work, name) is not None
+
+
+def test_the_same_repository_comes_back_twice_in_one_block():
+    with UnitOfWork(database()) as work:
+        assert work.jobs is work.jobs
+
+
+def test_a_new_block_builds_a_new_repository():
+    made = database()
+    with UnitOfWork(made) as work:
+        first = work.jobs
+    with UnitOfWork(made) as work:
+        assert work.jobs is not first
+
+
+def test_leaving_the_block_puts_the_repositories_back():
+    work = UnitOfWork(database())
+    with work:
+        pass
+    with pytest.raises(ConflictError):
+        work.welds
+
+
+def test_the_descriptor_on_the_class_is_the_descriptor():
+    from qu_imager.persistence.unit_of_work import Opened
+
+    assert isinstance(UnitOfWork.__dict__["jobs"], Opened)
+    assert UnitOfWork.jobs.name == "jobs"

@@ -20,9 +20,10 @@ repositories so that queries stay in one place.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from types import TracebackType
+from typing import Any, Generic, TypeVar, cast, overload
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -77,35 +78,79 @@ def create_schema(engine: Engine) -> None:
     Base.metadata.create_all(engine)
 
 
+T = TypeVar("T")
+
+
+class Opened(Generic[T]):
+    """A repository that exists while the unit of work is open and not before.
+
+    Ten of these were written out by hand: an optional attribute, a line in the
+    constructor, a line in the enter, a four line property that raised when it
+    was None, and a line in the exit that put it back. Fifty lines of the same
+    thing, and the eleventh was added by copying the tenth and changing two
+    words, which is how the tenth came to be there as well.
+
+    The descriptor keeps the refusal in one place and puts the repository's
+    real type on the attribute, so callers do not see an optional and the enter
+    and exit no longer have a list to keep in step with the constructor. The
+    value lives in the instance dictionary rather than in a private attribute,
+    which is what makes the closed state absent rather than None.
+    """
+
+    def __init__(self, build: Callable[[Session], T]) -> None:
+        self.build = build
+        self.name = ""
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self.name = name
+
+    @overload
+    def __get__(self, instance: None, owner: type | None = None) -> Opened[T]: ...
+
+    @overload
+    def __get__(self, instance: object, owner: type | None = None) -> T: ...
+
+    def __get__(self, instance: object | None, owner: type | None = None) -> Opened[T] | T:
+        if instance is None:
+            return self
+        try:
+            return cast(T, instance.__dict__[self.name])
+        except KeyError:
+            raise ConflictError("this unit of work is not open") from None
+
+    def open(self, instance: object, session: Session) -> None:
+        instance.__dict__[self.name] = self.build(session)
+
+    def close(self, instance: object) -> None:
+        instance.__dict__.pop(self.name, None)
+
+
 class UnitOfWork:
     """A transaction, with the repositories that share it."""
+
+    sources = Opened(SourceRepository)
+    jobs = Opened(JobRepository)
+    welds = Opened(WeldRepository)
+    numbering = Opened(Numbering)
+    incidents = Opened(IncidentRepository)
+    calibrations = Opened(CalibrationRepository)
+    stock = Opened(StockRepository)
+    archive = Opened(ArchiveRepository)
+    qualifications = Opened(QualificationRepository)
+    audit = Opened(AuditRepository)
 
     def __init__(self, factory: sessionmaker[Session]) -> None:
         self._factory = factory
         self._session: Session | None = None
-        self._sources: SourceRepository | None = None
-        self._jobs: JobRepository | None = None
-        self._welds: WeldRepository | None = None
-        self._numbering: Numbering | None = None
-        self._incidents: IncidentRepository | None = None
-        self._calibrations: CalibrationRepository | None = None
-        self._stock: StockRepository | None = None
-        self._archive: ArchiveRepository | None = None
-        self._qualifications: QualificationRepository | None = None
-        self._audit: AuditRepository | None = None
+
+    @classmethod
+    def _repositories(cls) -> tuple[Opened[Any], ...]:
+        return tuple(value for value in vars(cls).values() if isinstance(value, Opened))
 
     def __enter__(self) -> UnitOfWork:
         self._session = self._factory()
-        self._sources = SourceRepository(self._session)
-        self._jobs = JobRepository(self._session)
-        self._welds = WeldRepository(self._session)
-        self._numbering = Numbering(self._session)
-        self._incidents = IncidentRepository(self._session)
-        self._calibrations = CalibrationRepository(self._session)
-        self._stock = StockRepository(self._session)
-        self._archive = ArchiveRepository(self._session)
-        self._qualifications = QualificationRepository(self._session)
-        self._audit = AuditRepository(self._session)
+        for repository in self._repositories():
+            repository.open(self, self._session)
         return self
 
     @property
@@ -114,77 +159,10 @@ class UnitOfWork:
 
     @property
     def session(self) -> Session:
-        """The session, or a refusal. Never None, which is the whole point.
-
-        The repositories used to be plain attributes typed as optional, so
-        every caller had to prove they were not None before using them and the
-        proof was three lines of noise at the top of every handler. Making them
-        properties that refuse moves the check to one place and takes the
-        optional out of the type.
-        """
+        """The session, or a refusal. Never None, which is the whole point."""
         if self._session is None:
             raise ConflictError("this unit of work is not open")
         return self._session
-
-    @property
-    def sources(self) -> SourceRepository:
-        if self._sources is None:
-            raise ConflictError("this unit of work is not open")
-        return self._sources
-
-    @property
-    def jobs(self) -> JobRepository:
-        if self._jobs is None:
-            raise ConflictError("this unit of work is not open")
-        return self._jobs
-
-    @property
-    def welds(self) -> WeldRepository:
-        if self._welds is None:
-            raise ConflictError("this unit of work is not open")
-        return self._welds
-
-    @property
-    def numbering(self) -> Numbering:
-        if self._numbering is None:
-            raise ConflictError("this unit of work is not open")
-        return self._numbering
-
-    @property
-    def incidents(self) -> IncidentRepository:
-        if self._incidents is None:
-            raise ConflictError("this unit of work is not open")
-        return self._incidents
-
-    @property
-    def calibrations(self) -> CalibrationRepository:
-        if self._calibrations is None:
-            raise ConflictError("this unit of work is not open")
-        return self._calibrations
-
-    @property
-    def stock(self) -> StockRepository:
-        if self._stock is None:
-            raise ConflictError("this unit of work is not open")
-        return self._stock
-
-    @property
-    def archive(self) -> ArchiveRepository:
-        if self._archive is None:
-            raise ConflictError("this unit of work is not open")
-        return self._archive
-
-    @property
-    def qualifications(self) -> QualificationRepository:
-        if self._qualifications is None:
-            raise ConflictError("this unit of work is not open")
-        return self._qualifications
-
-    @property
-    def audit(self) -> AuditRepository:
-        if self._audit is None:
-            raise ConflictError("this unit of work is not open")
-        return self._audit
 
     def __exit__(
         self,
@@ -199,16 +177,8 @@ class UnitOfWork:
         finally:
             self._session.close()
             self._session = None
-            self._sources = None
-            self._jobs = None
-            self._welds = None
-            self._numbering = None
-            self._incidents = None
-            self._calibrations = None
-            self._stock = None
-            self._archive = None
-            self._qualifications = None
-            self._audit = None
+            for repository in self._repositories():
+                repository.close(self)
 
     def commit(self) -> None:
         self.session.commit()
