@@ -103,6 +103,9 @@ class RadiographRow(Keyed, Base):
         # and was not at forty thousand.
         Index("ix_radiograph_exposed_at", "exposed_at"),
         Index("ix_radiograph_read_at", "read_at"),
+        CheckConstraint(
+            "reread_by IS NULL OR read_by IS NOT NULL", name="reread_follows_a_reading"
+        ),
     )
 
     weld_id: Mapped[int] = mapped_column(ForeignKey("weld.id"), nullable=False)
@@ -117,6 +120,13 @@ class RadiographRow(Keyed, Base):
     normalised_snr: Mapped[Decimal | None] = mapped_column(DecimalColumn, nullable=True)
     read_by: Mapped[str | None] = mapped_column(String(40), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # A reread is a second reading of the same film by a second person, and
+    # it is kept beside the first rather than over it. Overwriting read_by
+    # would leave a report that names one reader for a film two people read,
+    # which is the one fact a disputed reading turns on.
+    reread_by: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    reread_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reread_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     weld: Mapped[WeldRow] = relationship(back_populates="radiographs")
     indications: Mapped[list[IndicationRow]] = relationship(

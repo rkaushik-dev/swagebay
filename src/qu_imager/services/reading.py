@@ -23,6 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 
+from qu_imager.audit import Action, Entry
 from qu_imager.errors import ConflictError, ValidationError
 from qu_imager.evaluation.acceptance import Verdict, judge
 from qu_imager.evaluation.indication import Indication, IndicationSet
@@ -74,6 +75,122 @@ def record_reading(work: UnitOfWork, record: ReadingRecord) -> None:
     for indication in record.indications:
         row.indications.append(indication_to_row(indication))
     work.flush()
+
+
+@dataclass(frozen=True, slots=True)
+class RereadRequest:
+    """A second reading of the same film, by somebody else, on the record."""
+
+    radiograph_number: str
+    reader: Person
+    read_at: datetime
+    reason: str
+    indications: tuple[Indication, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.radiograph_number.strip():
+            raise ValidationError("a reread names the film it was made on")
+        if not self.reason.strip():
+            raise ValidationError("a reread says why it was asked for")
+
+
+def record_reread(work: UnitOfWork, request: RereadRequest) -> None:
+    """Store a second reading beside the first, never over it.
+
+    A client who disagrees with a call asks for another reader to look at the
+    same film. What comes back is a second opinion and the record has to hold
+    both, because the interesting case is the one where they differ and a
+    record that keeps only the later one hides exactly that.
+
+    The second reader's indications become the ones the disposition is computed
+    from, since a reread exists to correct the first pass. What the first pass
+    said is not lost. It goes on the audit trail as the old value, with the
+    reason the reread was asked for.
+    """
+    row = work.welds.radiograph(request.radiograph_number)
+
+    if row.read_at is None:
+        raise ConflictError(
+            "nothing has been read on that film yet", number=request.radiograph_number
+        )
+    if row.reread_at is not None:
+        raise ConflictError(
+            "that film has already been reread",
+            number=request.radiograph_number,
+            by=row.reread_by,
+        )
+    if row.read_by == request.reader.badge:
+        raise ConflictError(
+            "a reread is done by somebody other than the first reader",
+            badge=request.reader.badge,
+        )
+    if request.read_at < row.read_at:
+        raise ConflictError(
+            "a reread comes after the reading it revisits",
+            number=request.radiograph_number,
+        )
+    if not request.reader.may_interpret_on(request.read_at.date()):
+        raise ConflictError(
+            "that reader may not interpret film on that day",
+            badge=request.reader.badge,
+            lapsed=", ".join(request.reader.lapsed_on(request.read_at.date())),
+        )
+
+    was = _describe_indications(tuple(row_to_indication(i) for i in row.indications))
+    became = _describe_indications(request.indications)
+
+    row.reread_by = request.reader.badge
+    row.reread_at = request.read_at
+    row.reread_reason = request.reason
+    row.indications.clear()
+    for indication in request.indications:
+        row.indications.append(indication_to_row(indication))
+
+    if was != became:
+        work.audit.changed(
+            request.read_at,
+            request.reader.badge,
+            "radiograph",
+            request.radiograph_number,
+            "indications",
+            was,
+            became,
+            request.reason,
+        )
+    else:
+        work.audit.append(
+            Entry(
+                at=request.read_at,
+                actor=request.reader.badge,
+                action=Action.SIGNED,
+                record="radiograph",
+                identity=request.radiograph_number,
+                reason=request.reason,
+            )
+        )
+    work.flush()
+
+
+def _describe_indications(found: tuple[Indication, ...]) -> str:
+    """What a reader wrote down, in one line, so the trail can hold it."""
+    if not found:
+        return "nothing"
+    return "; ".join(sorted(i.describe() for i in found))
+
+
+def readers_of(work: UnitOfWork, number: str) -> tuple[str, ...]:
+    """Every person who has read one film, in the order they read it."""
+    row = work.welds.radiograph(number)
+    return tuple(badge for badge in (row.read_by, row.reread_by) if badge is not None)
+
+
+def disputed(work: UnitOfWork, job: JobNumber) -> tuple[str, ...]:
+    """Films two readers looked at, which are the ones a review asks about."""
+    job_row = work.jobs.get(job)
+    found: list[str] = []
+    for weld_row in job_row.welds:
+        found.extend(r.number for r in weld_row.radiographs if r.reread_at is not None)
+    return tuple(sorted(found))
 
 
 def weld_verdict(work: UnitOfWork, job: JobNumber, weld: WeldId) -> Verdict | None:
