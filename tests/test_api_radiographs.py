@@ -194,3 +194,119 @@ def test_a_film_that_does_not_exist_is_a_four_oh_four(api):
 def test_the_openapi_document_lists_the_radiograph_routes(api):
     paths = api.get("/openapi.json").json()["paths"]
     assert "/jobs/{number}/welds/{weld}/shots" in paths
+
+
+AGAIN = "2024-10-27T09:00:00"
+SLAG = [
+    {
+        "kind": "ESI",
+        "starts_at": {"text": "100 mm"},
+        "length": {"text": "20 mm"},
+        "width": {"text": "1 mm"},
+    }
+]
+POROSITY = [
+    {
+        "kind": "P",
+        "starts_at": {"text": "100 mm"},
+        "length": {"text": "3 mm"},
+        "width": {"text": "3 mm"},
+    }
+]
+
+
+def read_film(api, indications=None):
+    number = api.post(f"{BASE}/shots", json=a_shot()).json()["number"]
+    api.post(
+        f"{BASE}/radiographs/{number}/reading",
+        json={"reader_badge": "0142", "read_at": READ, "indications": indications or SLAG},
+    )
+    return number
+
+
+def test_a_reread_names_both_readers(api):
+    number = read_film(api)
+    response = api.post(
+        f"{BASE}/radiographs/{number}/reread",
+        json={
+            "reader_badge": "0201",
+            "read_at": AGAIN,
+            "reason": "client asked",
+            "indications": POROSITY,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["readers"] == ["0142", "0201"]
+    assert response.json()["changed"] is True
+
+
+def test_a_reread_that_agrees_reports_no_change(api):
+    number = read_film(api)
+    response = api.post(
+        f"{BASE}/radiographs/{number}/reread",
+        json={
+            "reader_badge": "0201",
+            "read_at": AGAIN,
+            "reason": "second look",
+            "indications": SLAG,
+        },
+    )
+    assert response.json()["changed"] is False
+
+
+def test_a_reread_with_no_reason_is_refused_by_the_schema(api):
+    number = read_film(api)
+    response = api.post(
+        f"{BASE}/radiographs/{number}/reread",
+        json={"reader_badge": "0201", "read_at": AGAIN, "reason": ""},
+    )
+    assert response.status_code == 422
+
+
+def test_a_reread_by_the_first_reader_is_a_conflict(api):
+    number = read_film(api)
+    response = api.post(
+        f"{BASE}/radiographs/{number}/reread",
+        json={"reader_badge": "0142", "read_at": AGAIN, "reason": "why"},
+    )
+    assert response.status_code == 409
+
+
+def test_a_reread_of_an_unread_film_is_a_conflict(api):
+    number = api.post(f"{BASE}/shots", json=a_shot()).json()["number"]
+    response = api.post(
+        f"{BASE}/radiographs/{number}/reread",
+        json={"reader_badge": "0201", "read_at": AGAIN, "reason": "why"},
+    )
+    assert response.status_code == 409
+
+
+def test_the_history_of_a_film_nobody_argued_about_is_empty(api):
+    number = read_film(api)
+    response = api.get(f"{BASE}/radiographs/{number}/history")
+    assert response.status_code == 200
+    assert response.json()["entries"] == []
+    assert response.json()["after_signing"] == 0
+
+
+def test_the_history_carries_what_the_first_reader_said(api):
+    number = read_film(api)
+    api.post(
+        f"{BASE}/radiographs/{number}/reread",
+        json={
+            "reader_badge": "0201",
+            "read_at": AGAIN,
+            "reason": "client asked",
+            "indications": POROSITY,
+        },
+    )
+    body = api.get(f"{BASE}/radiographs/{number}/history").json()
+    assert len(body["entries"]) == 1
+    assert body["entries"][0]["action"] == "changed"
+    assert body["entries"][0]["was"].startswith("ESI")
+    assert body["entries"][0]["reason"] == "client asked"
+
+
+def test_the_history_of_a_film_that_does_not_exist_is_a_404(api):
+    response = api.get(f"{BASE}/radiographs/24-0001-R9999/history")
+    assert response.status_code == 404

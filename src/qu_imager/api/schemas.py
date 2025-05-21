@@ -508,3 +508,45 @@ class CalibrationOut(BaseModel):
     calibrated_on: date
     due_on: date
     laboratory: str
+
+
+class RereadIn(BaseModel):
+    """A second reading of the same film. The reason is not optional."""
+
+    model_config = ConfigDict(frozen=True)
+
+    reader_badge: str = Field(min_length=1, max_length=20)
+    read_at: datetime
+    reason: str = Field(min_length=1, max_length=200)
+    indications: tuple[IndicationIn, ...] = ()
+
+
+class RereadOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    radiograph: str
+    readers: tuple[str, ...]
+    changed: bool
+
+
+class EntryOut(BaseModel):
+    """One line of the audit trail as it goes over the wire."""
+
+    model_config = ConfigDict(frozen=True)
+
+    at: datetime
+    actor: str
+    action: str
+    field_name: str
+    was: str
+    became: str
+    reason: str
+
+
+class HistoryOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    record: str
+    identity: str
+    entries: tuple[EntryOut, ...]
+    after_signing: int

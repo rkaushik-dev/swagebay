@@ -21,7 +21,16 @@ from datetime import date, datetime
 from fastapi import APIRouter, status
 
 from qu_imager.api.app import Work
-from qu_imager.api.schemas import ReadingIn, ShotIn, ShotOut
+from qu_imager.api.schemas import (
+    EntryOut,
+    HistoryOut,
+    ReadingIn,
+    RereadIn,
+    RereadOut,
+    ShotIn,
+    ShotOut,
+)
+from qu_imager.audit import Action
 from qu_imager.errors import ValidationError
 from qu_imager.evaluation.indication import Indication
 from qu_imager.identity import ClockPosition, JobNumber, WeldId
@@ -35,7 +44,13 @@ from qu_imager.imaging.system import ImagingSystem
 from qu_imager.naming import kind_named, technique_class_named
 from qu_imager.personnel import Level, LicenceRole, Person
 from qu_imager.quantities.length import Length
-from qu_imager.services.reading import ReadingRecord, record_reading
+from qu_imager.services.reading import (
+    ReadingRecord,
+    RereadRequest,
+    readers_of,
+    record_reading,
+    record_reread,
+)
 from qu_imager.services.shooting import ShotRecord, record_shot
 
 router = APIRouter(prefix="/jobs/{number}/welds/{weld}", tags=["radiographs"])
@@ -163,4 +178,55 @@ def _reader(badge: str, read_at: datetime) -> Person:
         certified_on=day,
         near_vision_on=day,
         colour_perception_on=day,
+    )
+
+
+@router.post("/radiographs/{radiograph}/reread")
+def reread(number: str, weld: str, radiograph: str, body: RereadIn, work: Work) -> RereadOut:
+    """A second reader's call on a film somebody has already read.
+
+    This is a post to its own path rather than a put on the reading, because it
+    is not an edit of the reading. The first reading stays exactly where it
+    was. Putting it behind put would tell every caller the opposite.
+    """
+    record_reread(
+        work,
+        RereadRequest(
+            radiograph_number=radiograph,
+            reader=_reader(body.reader_badge, body.read_at),
+            read_at=body.read_at,
+            reason=body.reason,
+            indications=tuple(_indication(item) for item in body.indications),
+        ),
+    )
+    history = work.audit.for_record("radiograph", radiograph)
+    return RereadOut(
+        radiograph=radiograph,
+        readers=readers_of(work, radiograph),
+        changed=any(e.action is Action.CHANGED for e in history),
+    )
+
+
+@router.get("/radiographs/{radiograph}/history")
+def history(number: str, weld: str, radiograph: str, work: Work) -> HistoryOut:
+    """Everything the trail holds about one film, oldest first."""
+    entries = work.audit.for_record("radiograph", radiograph)
+    if not entries:
+        work.welds.radiograph(radiograph)
+    return HistoryOut(
+        record="radiograph",
+        identity=radiograph,
+        entries=tuple(
+            EntryOut(
+                at=entry.at,
+                actor=entry.actor,
+                action=str(entry.action),
+                field_name=entry.field_name,
+                was=entry.was,
+                became=entry.became,
+                reason=entry.reason,
+            )
+            for entry in entries
+        ),
+        after_signing=len(work.audit.changed_after_signing("radiograph", radiograph)),
     )
