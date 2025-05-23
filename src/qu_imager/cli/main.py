@@ -107,6 +107,7 @@ def load_commands() -> None:
     """Import the command modules so their decorators register the commands."""
     from qu_imager.cli import (  # noqa: F401
         catalogue,
+        history,
         jobs,
         registers,
         reports,
