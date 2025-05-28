@@ -30,6 +30,7 @@ from qu_imager.persistence.models.sources import (
     SourceRow,
     TripRow,
 )
+from qu_imager.persistence.models.store import StoredImageRow
 from qu_imager.persistence.models.work import (
     IndicationRow,
     JobRow,
@@ -58,6 +59,7 @@ __all__ = [
     "RadiographRow",
     "SightingRow",
     "SourceRow",
+    "StoredImageRow",
     "SurveyPointRow",
     "SurveyRow",
     "TripRow",

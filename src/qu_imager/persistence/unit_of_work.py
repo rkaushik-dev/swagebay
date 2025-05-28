@@ -45,6 +45,7 @@ from qu_imager.persistence.repositories import (
     SourceRepository,
     WeldRepository,
 )
+from qu_imager.persistence.store_repository import StoreRepository
 
 
 def build_engine(url: str = "sqlite://", echo: bool = False) -> Engine:
@@ -138,6 +139,7 @@ class UnitOfWork:
     archive = Opened(ArchiveRepository)
     qualifications = Opened(QualificationRepository)
     audit = Opened(AuditRepository)
+    store = Opened(StoreRepository)
 
     def __init__(self, factory: sessionmaker[Session]) -> None:
         self._factory = factory
