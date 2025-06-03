@@ -113,6 +113,7 @@ def load_commands() -> None:
         reports,
         safety,
         sources,
+        store,
         technique,
         welds,
     )
