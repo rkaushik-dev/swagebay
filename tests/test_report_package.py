@@ -183,13 +183,17 @@ def test_the_repair_rate_counts_welds_not_repairs():
         package = assemble(work, job)
         assert package.welds_shot == 5
         assert package.welds_repaired == 1
-        assert package.repair_rate() == Decimal(1) / Decimal(5)
+        assert package.repair_rate().repaired == 1
+        assert package.repair_rate().shot == 5
+        assert package.repair_rate().value == Decimal(1) / Decimal(5)
 
 
 def test_a_job_with_nothing_shot_has_no_repair_rate_rather_than_a_crash():
     made = database()
     with transaction(made) as work:
-        assert assemble(work, a_job(work)).repair_rate() == Decimal(0)
+        rate = assemble(work, a_job(work)).repair_rate()
+        assert rate.value == Decimal(0)
+        assert not rate.is_reportable
 
 
 def test_a_job_that_is_not_there_is_refused():
@@ -204,3 +208,31 @@ def test_the_package_carries_the_dates_the_job_was_open():
         package = assemble(work, a_job(work))
         assert package.opened_on == OPENED
         assert package.closed_on is None
+
+
+def test_a_rate_with_a_denominator_behind_it_is_reportable():
+    made = database()
+    with transaction(made) as work:
+        job = a_job(work)
+        for index in range(1, 25):
+            weld = f"GW-{index:03d}"
+            a_weld(work, job, weld)
+            number = shoot(work, job, weld=weld)
+            record_reading(work, ReadingRecord(number, a_reader(), READ))
+        rate = assemble(work, job).repair_rate()
+    assert rate.shot == 24
+    assert rate.is_reportable
+    assert "on 24" in rate.describe()
+
+
+def test_a_rate_on_a_handful_of_welds_says_so_rather_than_a_percentage():
+    made = database()
+    with transaction(made) as work:
+        job = a_job(work)
+        for weld in ("GW-104", "GW-104R1"):
+            a_weld(work, job, weld)
+            number = shoot(work, job, weld=weld)
+            record_reading(work, ReadingRecord(number, a_reader(), READ))
+        rate = assemble(work, job).repair_rate()
+    assert not rate.is_reportable
+    assert rate.describe() == "1 of 2, too few to rate"

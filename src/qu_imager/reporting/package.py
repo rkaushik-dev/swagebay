@@ -24,7 +24,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
 
 from qu_imager.evaluation.acceptance import Code, Verdict, judge
 from qu_imager.evaluation.indication import IndicationSet
@@ -34,6 +33,7 @@ from qu_imager.persistence.models.work import WeldRow
 from qu_imager.persistence.unit_of_work import UnitOfWork
 from qu_imager.persistence.work_mapper import row_to_indication
 from qu_imager.quantities.length import Length
+from qu_imager.reporting.statistics import Rate
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,10 +90,16 @@ class Package:
     def welds_repaired(self) -> int:
         return len({w.weld.split("R")[0] for w in self.welds if "R" in w.weld})
 
-    def repair_rate(self) -> Decimal:
-        if self.welds_shot == 0:
-            return Decimal(0)
-        return Decimal(self.welds_repaired) / Decimal(self.welds_shot)
+    def repair_rate(self) -> Rate:
+        """The rate with the count it came from, never the bare number.
+
+        This used to hand back a Decimal, which went out on the summary sheet
+        as four places whatever the denominator was. A client read 0.5000 off
+        a job with two welds on it and asked why the repair rate had gone up
+        by a factor of ten. The Rate carries the count, so the sheet can
+        decline to state a percentage that means nothing.
+        """
+        return Rate(repaired=self.welds_repaired, shot=self.welds_shot)
 
     def counts_agree(self) -> bool:
         """The summary and the detail have to add up to the same thing."""

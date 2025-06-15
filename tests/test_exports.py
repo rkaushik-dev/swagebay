@@ -100,9 +100,18 @@ def test_an_incomplete_package_says_so_in_the_summary():
     assert body[1][sheet_named("summary").columns.index("complete")] == "no"
 
 
-def test_the_repair_rate_is_written_to_four_places():
+def test_a_rate_on_two_welds_is_left_blank_rather_than_stated():
     body = rows(to_text(a_package(), "summary"))
-    assert body[1][sheet_named("summary").columns.index("repair_rate")] == "0.5000"
+    assert body[1][sheet_named("summary").columns.index("repair_rate")] == ""
+    assert body[1][sheet_named("summary").columns.index("repair_rate_basis")] == "1 of 2"
+
+
+def test_a_rate_with_a_denominator_behind_it_is_written_to_four_places():
+    welds = tuple(
+        WeldLine(f"GW-{index:03d}", mm("10.97"), "w-19", 1, "accept", ()) for index in range(1, 41)
+    )
+    body = rows(to_text(a_package(welds=welds), "summary"))
+    assert body[1][sheet_named("summary").columns.index("repair_rate")] == "0.0000"
 
 
 def test_an_open_job_leaves_the_close_date_empty():

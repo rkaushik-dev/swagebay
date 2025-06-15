@@ -69,8 +69,8 @@ def test_the_package_carries_the_job_details(shop):
     assert "complete        no" in output
 
 
-def test_the_repair_rate_is_printed_as_a_percentage(shop):
-    assert "repair rate     0.00%" in shop("report", "package", "24-0001").output
+def test_the_repair_rate_is_printed_with_the_count_it_came_from(shop):
+    assert "repair rate     0 of 0, too few to rate" in shop("report", "package", "24-0001").output
 
 
 def test_the_weld_table_lists_every_weld(shop):

@@ -6,6 +6,11 @@ Every file starts with a header row and the header names are stable. A client
 integration keys on them, so renaming a column is a breaking change even though
 nothing in this package would notice.
 
+A rate goes out with the count it came from, and goes out blank when the
+count is too small to carry a percentage. That is a change to what the
+repair_rate column holds and it was made deliberately, because the old
+behaviour sent a client four decimal places off a denominator of two.
+
 Lengths go out in millimetres to two places and the column name says so. A
 column called wall with 10970 in it has been read as millimetres by somebody
 every time it has ever been sent, and putting the unit in the name is the only
@@ -27,12 +32,12 @@ import csv
 import io
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 
 from qu_imager.errors import ValidationError
 from qu_imager.imaging.store import Manifest
 from qu_imager.quantities.length import Length
 from qu_imager.reporting.package import Package
+from qu_imager.reporting.statistics import Rate
 
 Row = Sequence[object]
 
@@ -56,8 +61,13 @@ def _millimetres(value: Length) -> str:
     return f"{value.mm:.2f}"
 
 
-def _rate(value: Decimal) -> str:
-    return f"{value:.4f}"
+def _rate(rate: Rate) -> str:
+    """A percentage, or nothing at all when the denominator cannot carry one.
+
+    An empty cell is the honest answer to a rate on four welds. A number
+    there would be read, and it would be read as a trend.
+    """
+    return f"{rate.value:.4f}" if rate.is_reportable else ""
 
 
 def _weld_rows(package: Package) -> Iterable[Row]:
@@ -100,6 +110,7 @@ def _summary_rows(package: Package) -> Iterable[Row]:
         package.welds_shot,
         package.welds_repaired,
         _rate(package.repair_rate()),
+        f"{package.repair_rate().repaired} of {package.repair_rate().shot}",
         len(package.radiographs),
         "yes" if package.is_complete else "no",
     ]
@@ -140,6 +151,7 @@ SHEETS = (
             "welds_shot",
             "welds_repaired",
             "repair_rate",
+            "repair_rate_basis",
             "radiographs",
             "complete",
         ),

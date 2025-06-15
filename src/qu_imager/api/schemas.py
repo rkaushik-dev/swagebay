@@ -445,6 +445,7 @@ class PackageOut(BaseModel):
     welds_shot: int
     welds_repaired: int
     repair_rate: Decimal
+    repair_rate_reportable: bool
     radiographs: int
     welds: tuple[WeldSummaryOut, ...]
 

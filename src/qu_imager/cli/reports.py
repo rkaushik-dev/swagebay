@@ -51,7 +51,7 @@ def package_command(ctx: click.Context, number: str) -> None:
                 ("welds", str(len(package.welds))),
                 ("welds shot", str(package.welds_shot)),
                 ("welds repaired", str(package.welds_repaired)),
-                ("repair rate", f"{package.repair_rate():.2%}"),
+                ("repair rate", package.repair_rate().describe()),
                 ("radiographs", str(len(package.radiographs))),
                 ("complete", yes_no(package.is_complete)),
             ]

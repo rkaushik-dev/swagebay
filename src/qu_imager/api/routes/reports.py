@@ -41,7 +41,8 @@ def read_package(number: str, work: Work) -> PackageOut:
         faults=package.faults,
         welds_shot=package.welds_shot,
         welds_repaired=package.welds_repaired,
-        repair_rate=package.repair_rate(),
+        repair_rate=package.repair_rate().value,
+        repair_rate_reportable=package.repair_rate().is_reportable,
         radiographs=len(package.radiographs),
         welds=tuple(
             WeldSummaryOut(

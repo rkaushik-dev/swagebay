@@ -168,7 +168,9 @@ def test_a_job_walks_from_open_to_closed():
         assert package.counts_agree()
         assert package.welds_shot == 2
         assert package.welds_repaired == 1
-        assert package.repair_rate() == Decimal(1) / Decimal(2)
+        assert package.repair_rate().repaired == 1
+        assert package.repair_rate().shot == 2
+        assert not package.repair_rate().is_reportable
         assert len(package.radiographs) == exposures * 2
 
     with transaction(made) as work:
