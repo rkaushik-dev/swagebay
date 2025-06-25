@@ -172,3 +172,19 @@ def film_evidence(penetrated_mm=26, visible=True, density="2.50", at=None):
             read_at=moment,
         ),
     )
+
+
+def pass_inspections(work, device_serial, day, quarterly_on=None):
+    """Put a device through both checks so it can leave the shop.
+
+    Every test that books a source out needs this now. Before the dispatch gate
+    existed they did not, and the ones that were written first are the reason
+    the helper lives here rather than being copied into each of them again.
+    """
+    from datetime import timedelta
+
+    from qu_imager.safety.maintenance import pre_use, quarterly
+
+    stripped = quarterly_on or day - timedelta(days=30)
+    work.maintenance.record(quarterly(device_serial, stripped, "0303"))
+    work.maintenance.record(pre_use(device_serial, day, "0142"))

@@ -36,6 +36,19 @@ def register(run, serial="IR-5512", curies="90"):
     )
 
 
+def inspected(shop, serial="880D-221", day="2024-11-04"):
+    """Both checks, so the dispatch gate lets the load out."""
+    shop("device", "inspect", serial, "--quarterly", "--on", "2024-10-14", "--by", "0303")
+    shop("device", "inspect", serial, "--on", day, "--by", "0142")
+
+
+def ready(shop, serial="IR-5512"):
+    """Everything the gate asks for: a source, a wipe test and a checked camera."""
+    register(shop, serial)
+    shop("source", "wipe", serial, "--at", ASSAY, "--by", "rp")
+    inspected(shop)
+
+
 def test_a_source_is_registered(shop):
     result = register(shop)
     assert result.exit_code == 0
@@ -84,7 +97,7 @@ def test_a_failing_wipe_says_the_source_is_out_of_service(shop):
 
 
 def test_a_source_goes_out_and_comes_back(shop):
-    register(shop)
+    ready(shop)
     out = shop(
         "source",
         "send-out",
@@ -105,7 +118,7 @@ def test_a_source_goes_out_and_comes_back(shop):
 
 
 def test_a_source_cannot_go_out_twice(shop):
-    register(shop)
+    ready(shop)
     args = (
         "source",
         "send-out",
@@ -136,8 +149,7 @@ def test_the_overdue_list_names_the_sources_that_need_wiping(shop):
 
 
 def test_the_history_reads_forwards_and_names_every_event(shop):
-    register(shop)
-    shop("source", "wipe", "IR-5512", "--at", ASSAY, "--by", "rp")
+    ready(shop)
     shop(
         "source",
         "send-out",

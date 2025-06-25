@@ -17,7 +17,7 @@ from qu_imager.services.wipes import (
 from qu_imager.sources.isotope import IR192
 from qu_imager.sources.sealed import SealedSource, SourceCertificate
 
-from conftest import database
+from conftest import database, pass_inspections
 
 ASSAY = datetime(2024, 10, 1)
 WIPED = datetime(2024, 10, 15, 9, 0)
@@ -153,6 +153,7 @@ def test_the_history_reads_forwards():
     with transaction(made) as work:
         stocked(work)
         record_wipe(work, "IR-5512", WIPED, Decimal(0), "rp")
+        pass_inspections(work, "880D-221", date(2024, 10, 20))
         send_out(
             work,
             Booking("IR-5512", "880D-221", "0142", "Come By Chance", date(2024, 10, 20)),

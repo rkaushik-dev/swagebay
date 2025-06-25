@@ -33,6 +33,30 @@ def a_source(serial="IR-5512", isotope="ir192"):
     }
 
 
+def inspected(api, serial="880D-221", day="2024-10-08"):
+    """Both checks, so the dispatch gate lets the load out."""
+    api.post(
+        f"/devices/{serial}/inspections",
+        json={"performed_on": "2024-09-20", "performed_by": "0303", "is_quarterly": True},
+    )
+    api.post(
+        f"/devices/{serial}/inspections",
+        json={"performed_on": day, "performed_by": "0142"},
+    )
+
+
+def wiped(api, serial="IR-5512"):
+    """A current wipe test, seeded straight in because there is no endpoint yet."""
+    from datetime import datetime
+    from decimal import Decimal
+
+    from qu_imager.persistence.unit_of_work import transaction
+    from qu_imager.services.wipes import record_wipe
+
+    with transaction(api.app.state.session_factory) as work:
+        record_wipe(work, serial, datetime(2024, 10, 1), Decimal(0), "rp")
+
+
 def a_booking(site="Come By Chance"):
     return {
         "device_serial": "880D-221",
@@ -87,6 +111,8 @@ def test_the_sources_in_service_are_listed(api):
 
 def test_a_source_booked_out_reads_as_the_site(api):
     api.post("/sources", json=a_source())
+    wiped(api)
+    inspected(api)
     response = api.post("/sources/IR-5512/send-out", json=a_booking())
     assert response.status_code == 200
     assert response.json()["location"] == "Come By Chance"
@@ -107,6 +133,8 @@ def test_a_device_that_is_not_on_the_inventory_is_a_four_oh_four(api):
 
 def test_bringing_a_source_back_puts_it_in_the_shop(api):
     api.post("/sources", json=a_source())
+    wiped(api)
+    inspected(api)
     api.post("/sources/IR-5512/send-out", json=a_booking())
     response = api.post(
         "/sources/IR-5512/bring-back", json={"came_back": "2024-10-10", "exposures": 24}
@@ -117,6 +145,8 @@ def test_bringing_a_source_back_puts_it_in_the_shop(api):
 
 def test_a_return_before_the_departure_is_refused(api):
     api.post("/sources", json=a_source())
+    wiped(api)
+    inspected(api)
     api.post("/sources/IR-5512/send-out", json=a_booking())
     response = api.post(
         "/sources/IR-5512/bring-back", json={"came_back": "2024-10-01", "exposures": 0}
@@ -148,6 +178,8 @@ def test_a_retired_source_says_so_and_stops_going_out(api):
 
 def test_a_source_out_on_a_job_cannot_be_retired(api):
     api.post("/sources", json=a_source())
+    wiped(api)
+    inspected(api)
     api.post("/sources/IR-5512/send-out", json=a_booking())
     assert api.post("/sources/IR-5512/retire").status_code == 409
 
@@ -156,3 +188,94 @@ def test_the_openapi_document_lists_the_source_routes(api):
     paths = api.get("/openapi.json").json()["paths"]
     assert "/sources/{serial}/fitness" in paths
     assert "/sources/{serial}/send-out" in paths
+
+
+def test_an_inspection_is_recorded_and_read_back(api):
+    response = api.post(
+        "/devices/880D-221/inspections",
+        json={"performed_on": "2024-09-20", "performed_by": "0303", "is_quarterly": True},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["is_quarterly"]
+    assert body["passed"]
+    assert body["expires_on"] == "2024-12-21"
+
+
+def test_a_pre_use_check_does_not_expire(api):
+    body = api.post(
+        "/devices/880D-221/inspections",
+        json={"performed_on": "2024-10-08", "performed_by": "0142"},
+    ).json()
+    assert body["expires_on"] is None
+
+
+def test_a_safety_defect_comes_back_apart_from_a_noted_one(api):
+    body = api.post(
+        "/devices/880D-221/inspections",
+        json={
+            "performed_on": "2024-09-20",
+            "performed_by": "0303",
+            "is_quarterly": True,
+            "defects": [
+                {"item": "drive_cable", "account": "three strands broken"},
+                {"item": "wheels", "account": "one castor seized"},
+            ],
+        },
+    ).json()
+    assert not body["passed"]
+    assert body["blocking"] == ["drive cable: three strands broken"]
+    assert body["noted"] == ["wheels: one castor seized"]
+
+
+def test_an_item_nothing_inspects_is_a_422(api):
+    response = api.post(
+        "/devices/880D-221/inspections",
+        json={
+            "performed_on": "2024-09-20",
+            "performed_by": "0303",
+            "defects": [{"item": "flux_capacitor", "account": "humming"}],
+        },
+    )
+    assert response.status_code == 422
+    assert "drive_cable" in response.json()["context"]["known"]
+
+
+def test_a_devices_inspections_read_in_date_order(api):
+    inspected(api)
+    body = api.get("/devices/880D-221/inspections").json()
+    assert [i["performed_on"] for i in body] == ["2024-09-20", "2024-10-08"]
+
+
+def test_a_device_with_nothing_on_record_lists_nothing(api):
+    assert api.get("/devices/880D-221/inspections").json() == []
+
+
+def test_the_clearance_endpoint_says_no_and_why(api):
+    api.post("/sources", json=a_source())
+    body = api.get(
+        "/devices/880D-221/clearance",
+        params={"source": "IR-5512", "on": "2024-10-08", "crew": "0142"},
+    ).json()
+    assert not body["cleared"]
+    assert body["source_reasons"]
+    assert body["device_reasons"]
+    assert body["crew_reasons"] == []
+
+
+def test_the_clearance_endpoint_says_yes_when_everything_is_in_order(api):
+    api.post("/sources", json=a_source())
+    wiped(api)
+    inspected(api)
+    body = api.get(
+        "/devices/880D-221/clearance",
+        params={"source": "IR-5512", "on": "2024-10-08", "crew": "0142"},
+    ).json()
+    assert body["cleared"]
+    assert body["source_reasons"] == []
+
+
+def test_the_openapi_document_lists_the_device_routes(api):
+    paths = api.get("/openapi.json").json()["paths"]
+    assert "/devices/{serial}/inspections" in paths
+    assert "/devices/{serial}/clearance" in paths

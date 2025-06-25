@@ -41,7 +41,7 @@ from qu_imager.services.wipes import record_wipe
 from qu_imager.sources.isotope import IR192
 from qu_imager.sources.sealed import SealedSource, SourceCertificate
 
-from conftest import a_reader, database, film_evidence
+from conftest import a_reader, database, film_evidence, pass_inspections
 
 ASSAY = datetime(2025, 2, 1)
 SHOT = datetime(2025, 2, 12, 23, 30)
@@ -97,6 +97,7 @@ def test_a_job_walks_from_open_to_closed():
         add_weld(work, job, a_weld())
 
     with transaction(made) as work:
+        pass_inspections(work, "880D-221", date(2025, 2, 12))
         send_out(work, Booking("IR-5512", "880D-221", "0142", "Come By Chance", date(2025, 2, 12)))
         sheet = plan(
             work,
@@ -289,6 +290,7 @@ def test_a_source_that_went_out_and_came_back_reads_as_the_shop_again():
     job = prepared(made)
 
     with transaction(made) as work:
+        pass_inspections(work, "880D-221", date(2025, 2, 12))
         send_out(work, Booking("IR-5512", "880D-221", "0142", "site", date(2025, 2, 12)))
         assert work.sources.open_trip("IR-5512") is not None
 

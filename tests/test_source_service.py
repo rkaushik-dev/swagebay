@@ -21,7 +21,7 @@ from qu_imager.services.sources import (
 from qu_imager.sources.isotope import IR192
 from qu_imager.sources.sealed import LeakTest, SealedSource, SourceCertificate
 
-from conftest import database
+from conftest import database, pass_inspections
 
 ASSAY = datetime(2024, 10, 1)
 WENT = date(2024, 10, 7)
@@ -44,9 +44,12 @@ def a_source(serial="IR-5512", tested=True):
     return source
 
 
-def stocked(work, serial="IR-5512", tested=True):
+def stocked(work, serial="IR-5512", tested=True, inspected=True):
     register_source(work, a_source(serial, tested))
-    register_device(work, "880D-221", "880d")
+    if work.sources.find_device("880D-221") is None:
+        register_device(work, "880D-221", "880d")
+    if inspected:
+        pass_inspections(work, "880D-221", WENT)
 
 
 def a_booking(serial="IR-5512", site="Come By Chance"):
@@ -186,7 +189,7 @@ def test_a_retired_source_cannot_be_booked_out():
         retire(work, "IR-5512")
         with pytest.raises(ConflictError) as caught:
             send_out(work, a_booking())
-        assert caught.value.context["state"] == "awaiting disposal"
+        assert "awaiting disposal" in caught.value.context["reasons"]
 
 
 def test_a_source_out_on_a_job_cannot_be_retired():

@@ -551,3 +551,46 @@ class HistoryOut(BaseModel):
     identity: str
     entries: tuple[EntryOut, ...]
     after_signing: int
+
+
+class DefectIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    item: str = Field(min_length=1, max_length=30)
+    account: str = Field(min_length=1, max_length=400)
+
+
+class InspectionIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    performed_on: date
+    performed_by: str = Field(min_length=1, max_length=20)
+    is_quarterly: bool = False
+    defects: tuple[DefectIn, ...] = ()
+    notes: str = Field(default="", max_length=400)
+
+
+class InspectionOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    device_serial: str
+    performed_on: date
+    is_quarterly: bool
+    passed: bool
+    blocking: tuple[str, ...]
+    noted: tuple[str, ...]
+    expires_on: date | None
+
+
+class ClearanceOut(BaseModel):
+    """Why the truck is not moving, kept apart by what has to be fixed."""
+
+    model_config = ConfigDict(frozen=True)
+
+    device_serial: str
+    source_serial: str
+    day: date
+    cleared: bool
+    source_reasons: tuple[str, ...]
+    device_reasons: tuple[str, ...]
+    crew_reasons: tuple[str, ...]

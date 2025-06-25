@@ -24,6 +24,8 @@ from qu_imager.errors import ConflictError, ValidationError
 from qu_imager.persistence.models.sources import DeviceRow, SightingRow, TripRow
 from qu_imager.persistence.source_mapper import row_to_source, source_to_row
 from qu_imager.persistence.unit_of_work import UnitOfWork
+from qu_imager.personnel import Person
+from qu_imager.services.dispatch import require_clearance
 from qu_imager.sources.sealed import SealedSource, SourceState
 
 
@@ -36,6 +38,7 @@ class Booking:
     crew_badge: str
     site: str
     went_out: date
+    crew: tuple[Person, ...] = ()
 
     def __post_init__(self) -> None:
         for name, value in (
@@ -77,15 +80,25 @@ def register_device(work: UnitOfWork, serial: str, model_key: str) -> None:
 
 
 def send_out(work: UnitOfWork, booking: Booking) -> None:
-    """Book a source out to one job, refusing if it is already on another."""
+    """Book a source out to one job, refusing anything that is not cleared.
+
+    The single occupancy check stays here because it is about the trip table
+    and nothing else knows about it. Everything else the morning asks is in
+    the dispatch gate, which is called rather than restated, so a rule added
+    there lands here without anybody remembering to do it.
+    """
     source = work.sources.get(booking.source_serial)
     device = work.sources.device(booking.device_serial)
     if work.sources.open_trip(booking.source_serial) is not None:
         raise ConflictError("that source is already out", serial=booking.source_serial)
-    if source.state not in {"in service", "stored"}:
-        raise ConflictError(
-            "that source is not available", serial=source.serial, state=source.state
-        )
+    require_clearance(
+        work,
+        booking.device_serial,
+        booking.source_serial,
+        booking.went_out,
+        booking.crew,
+        booking.crew_badge,
+    )
     work.session.add(
         TripRow(
             source_id=source.id,
