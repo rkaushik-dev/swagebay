@@ -33,6 +33,7 @@ from qu_imager.errors import ConflictError
 from qu_imager.persistence.audit_repository import AuditRepository
 from qu_imager.persistence.base import Base
 from qu_imager.persistence.maintenance_repository import MaintenanceRepository
+from qu_imager.persistence.nonconformance_repository import NonconformanceRepository
 from qu_imager.persistence.numbering import Numbering
 from qu_imager.persistence.register_repositories import (
     ArchiveRepository,
@@ -142,6 +143,7 @@ class UnitOfWork:
     audit = Opened(AuditRepository)
     store = Opened(StoreRepository)
     maintenance = Opened(MaintenanceRepository)
+    nonconformances = Opened(NonconformanceRepository)
 
     def __init__(self, factory: sessionmaker[Session]) -> None:
         self._factory = factory
