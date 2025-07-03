@@ -594,3 +594,48 @@ class ClearanceOut(BaseModel):
     source_reasons: tuple[str, ...]
     device_reasons: tuple[str, ...]
     crew_reasons: tuple[str, ...]
+
+
+class ReportIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    reference: str = Field(min_length=1, max_length=40)
+    job: str = Field(min_length=1, max_length=20)
+    item: str = Field(min_length=1, max_length=60)
+    requirement: str = Field(min_length=1, max_length=120)
+    account: str = Field(min_length=1)
+    raised_on: date
+    raised_by: str = Field(min_length=1, max_length=20)
+
+
+class DecisionIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    disposition: str = Field(min_length=1, max_length=20)
+    concession: str = Field(default="", max_length=60)
+    removal: str = Field(default="", max_length=60)
+
+
+class CloseIn(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    closed_on: date
+    closed_by: str = Field(min_length=1, max_length=20)
+
+
+class ReportOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    reference: str
+    job: str
+    item: str
+    requirement: str
+    disposition: str | None
+    concession: str
+    removal: str
+    raised_on: date
+    raised_by: str
+    closed_on: date | None
+    closed_by: str | None
+    days_open: int
+    overdue: bool

@@ -110,6 +110,7 @@ def load_commands() -> None:
         devices,
         history,
         jobs,
+        nonconformance,
         registers,
         reports,
         safety,
