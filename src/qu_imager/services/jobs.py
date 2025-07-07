@@ -136,15 +136,27 @@ def outstanding(work: UnitOfWork, number: JobNumber) -> tuple[str, ...]:
 
 
 def close_job(work: UnitOfWork, number: JobNumber, on: date) -> None:
-    """Close a job, refusing while anything is outstanding."""
+    """Close a job, refusing while anything on the checklist is outstanding.
+
+    The list of things that count is in the close out service rather than
+    here, because it has grown past welds and films and every place that
+    prints it needs the same list this refuses on.
+    """
+    from qu_imager.services.closeout import checklist
+
     jobs = work.jobs
     job = jobs.get(number)
     if job.closed_on is not None:
         raise ConflictError("that job is already closed", job=str(number))
     if on < job.opened_on:
         raise ValidationError("a job cannot close before it opened", job=str(number))
-    remaining = outstanding(work, number)
-    if remaining:
-        raise ConflictError("the job is not finished", job=str(number), outstanding=len(remaining))
+    found = checklist(work, number)
+    if not found.is_clear:
+        raise ConflictError(
+            "the job is not finished",
+            job=str(number),
+            outstanding=len(found.reasons),
+            reasons="; ".join(found.reasons),
+        )
     job.closed_on = on
     work.flush()
