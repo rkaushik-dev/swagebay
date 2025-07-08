@@ -12,16 +12,15 @@ cannot go, so it can be the last line of a dispatch script.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 
 import click
 
+from qu_imager.cli.gates import as_day, report
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import bullets, heading, table
 from qu_imager.errors import ValidationError
 from qu_imager.safety.maintenance import Defect, Item, pre_use, quarterly
-
-EXIT_NOT_CLEARED = 4
 
 
 def _defect(text: str) -> Defect:
@@ -65,7 +64,7 @@ def inspect_command(
     note: str,
 ) -> None:
     """Record an inspection against a device."""
-    day = on.date() if on is not None else date.today()
+    day = as_day(on)
     raised = tuple(_defect(text) for text in defects)
     build = quarterly if is_quarterly else pre_use
     inspection = build(serial, day, badge, raised, note)
@@ -126,12 +125,15 @@ def clear_command(
     """Ask the gate whether this load can leave the shop today."""
     from qu_imager.services.dispatch import clearance
 
-    day = on.date() if on is not None else date.today()
+    day = as_day(on)
     with work_for(ctx) as work:
         found = clearance(work, serial, source_serial, day, (), lead_badge or "yard")
-    if found.cleared:
-        click.echo(found.describe())
-        return
-    click.echo(heading(f"{serial} with {source_serial} is not clear for {day}"))
-    click.echo(bullets(list(found.reasons)))
-    raise SystemExit(EXIT_NOT_CLEARED)
+    report(
+        f"{serial} with {source_serial} is not clear for {day}",
+        (
+            ("source", found.source_reasons),
+            ("device", found.device_reasons),
+            ("crew", found.crew_reasons),
+        ),
+        clear_message=found.describe(),
+    )

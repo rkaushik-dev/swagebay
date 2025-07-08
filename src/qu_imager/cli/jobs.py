@@ -13,10 +13,11 @@ how a job ends up with welds shot before they were welded.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 
 import click
 
+from qu_imager.cli.gates import as_day
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import pairs, table, yes_no
 from qu_imager.identity import JobNumber
@@ -45,7 +46,7 @@ def open_command(
     on: datetime | None,
 ) -> None:
     """Open a job and print its number."""
-    opened = on.date() if on is not None else date.today()
+    opened = as_day(on)
     with work_for(ctx) as work:
         number = open_job(
             work,
@@ -65,7 +66,7 @@ def open_command(
 @click.pass_context
 def list_command(ctx: click.Context, on: datetime | None) -> None:
     """List the jobs open on a day."""
-    day = on.date() if on is not None else date.today()
+    day = as_day(on)
     with work_for(ctx) as work:
         rows = [
             [
@@ -114,7 +115,7 @@ def show_command(ctx: click.Context, number: str) -> None:
 def close_command(ctx: click.Context, number: str, on: datetime | None) -> None:
     """Close a job, refusing while anything is outstanding."""
     identity = JobNumber.parse(number)
-    day = on.date() if on is not None else date.today()
+    day = as_day(on)
     with work_for(ctx) as work:
         close_job(work, identity, day)
     click.echo(f"closed {identity}")

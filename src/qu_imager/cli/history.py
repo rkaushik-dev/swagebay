@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 import click
 
+from qu_imager.cli.gates import report
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import heading, table
 
@@ -100,11 +101,13 @@ def after_signing_command(ctx: click.Context, record: str, identity: str) -> Non
     if not entries:
         click.echo(f"nothing changed on {record} {identity} after it was signed")
         return
-    click.echo(heading(f"{record} {identity} changed after signing"))
     click.echo(
         table(
             ["when", "who", "what", "field", "was", "became", "why"],
             _rows(entries),
         )
     )
-    raise SystemExit(4)
+    report(
+        f"{record} {identity} changed after signing",
+        (("", tuple(e.describe() for e in entries)),),
+    )

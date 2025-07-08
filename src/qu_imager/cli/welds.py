@@ -8,10 +8,11 @@ knows the other.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 
 import click
 
+from qu_imager.cli.gates import as_day
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import table
 from qu_imager.geometry.joint import Joint, JointForm
@@ -51,7 +52,7 @@ def add_command(
 ) -> None:
     """Add a weld to a job."""
     identity = JobNumber.parse(number)
-    welded = on.date() if on is not None else date.today()
+    welded = as_day(on)
     joint = Joint(
         form=JointForm.PLATE_BUTT if diameter is None else JointForm.PIPE_GIRTH,
         wall=Length.parse(wall),

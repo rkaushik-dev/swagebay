@@ -16,6 +16,7 @@ from datetime import date, datetime
 
 import click
 
+from qu_imager.cli.gates import as_day, report
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import bullets, heading, table
 from qu_imager.errors import ValidationError
@@ -78,7 +79,7 @@ def raise_command(
         item=item,
         requirement=requirement,
         account=account,
-        raised_on=on.date() if on is not None else date.today(),
+        raised_on=as_day(on),
         raised_by=badge,
     )
     with work_for(ctx) as work:
@@ -110,7 +111,7 @@ def decide_command(
 @click.pass_context
 def close_command(ctx: click.Context, reference: str, on: datetime | None, badge: str) -> None:
     """Close a report. Somebody other than the author has to do it."""
-    day = on.date() if on is not None else date.today()
+    day = as_day(on)
     with work_for(ctx) as work:
         report = work.nonconformances.close(reference, day, badge)
     click.echo(report.describe())
@@ -121,7 +122,7 @@ def close_command(ctx: click.Context, reference: str, on: datetime | None, badge
 @click.pass_context
 def open_command(ctx: click.Context, on: datetime | None) -> None:
     """Every open report, with the overdue ones called out."""
-    day = on.date() if on is not None else date.today()
+    day = as_day(on)
     with work_for(ctx) as work:
         reports = work.nonconformances.open_reports()
     if not reports:
@@ -146,7 +147,7 @@ def open_command(ctx: click.Context, on: datetime | None) -> None:
 @click.pass_context
 def job_command(ctx: click.Context, job: str, on: datetime | None) -> None:
     """Every report on one job, and what is stopping it being signed off."""
-    day = on.date() if on is not None else date.today()
+    day = as_day(on)
     with work_for(ctx) as work:
         reports = work.nonconformances.for_job(job)
         blocking = work.nonconformances.register_for(job).blocks_closing(job)
@@ -160,7 +161,4 @@ def job_command(ctx: click.Context, job: str, on: datetime | None) -> None:
             numeric=[4],
         )
     )
-    if blocking:
-        click.echo(heading("stopping the sign off"))
-        click.echo(bullets(list(blocking)))
-        raise SystemExit(4)
+    report("stopping the sign off", (("", blocking),))

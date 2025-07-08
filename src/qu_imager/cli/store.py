@@ -17,6 +17,7 @@ from datetime import datetime
 
 import click
 
+from qu_imager.cli.gates import report
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import bullets, heading, table
 from qu_imager.errors import ValidationError
@@ -30,7 +31,6 @@ from qu_imager.imaging.store import (
 )
 
 CHUNK = 1024 * 1024
-EXIT_STORE_MISMATCH = 4
 
 
 def _digest_of_file(path: pathlib.Path) -> tuple[str, int]:
@@ -156,14 +156,12 @@ def verify_command(ctx: click.Context, number: str, directory: pathlib.Path) -> 
         manifest = work.store.manifest_for(JobNumber.parse(number))
     found = manifest.verify(seen)
     click.echo(f"{len(manifest)} in the manifest, {len(seen)} on the disk")
-    click.echo(found.describe())
-    for label, names in (
-        ("missing", found.missing),
-        ("not in the manifest", found.unexpected),
-        ("changed since ingest", found.altered),
-    ):
-        if names:
-            click.echo(heading(label))
-            click.echo(bullets(list(names)))
-    if not found.is_clean:
-        raise SystemExit(EXIT_STORE_MISMATCH)
+    report(
+        found.describe(),
+        (
+            ("missing", found.missing),
+            ("not in the manifest", found.unexpected),
+            ("changed since ingest", found.altered),
+        ),
+        clear_message=found.describe(),
+    )
