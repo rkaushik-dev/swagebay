@@ -196,8 +196,20 @@ class MaintenanceRegister:
         found = [i for i in self.inspections if i.device_serial == serial]
         return tuple(sorted(found, key=lambda i: i.performed_on))
 
-    def latest_quarterly(self, serial: str) -> Inspection | None:
-        found = [i for i in self.for_device(serial) if i.is_quarterly]
+    def latest_quarterly(self, serial: str, on: date | None = None) -> Inspection | None:
+        """The last quarterly on or before a day, not the last one on file.
+
+        Without the day this answered from the whole file, so a device whose
+        quarterly was done on the sixteenth read as covered on the fifteenth.
+        That never showed up in the yard, where the question is always about
+        today, and it showed up immediately in a back dated booking and in
+        every clearance asked about a past day.
+        """
+        found = [
+            i
+            for i in self.for_device(serial)
+            if i.is_quarterly and (on is None or i.performed_on <= on)
+        ]
         return found[-1] if found else None
 
     def check_on(self, serial: str, day: date) -> Inspection | None:
@@ -209,7 +221,7 @@ class MaintenanceRegister:
     def reasons_not_to_use(self, serial: str, day: date) -> tuple[str, ...]:
         """Everything stopping this device going out that morning."""
         reasons: list[str] = []
-        latest = self.latest_quarterly(serial)
+        latest = self.latest_quarterly(serial, day)
         if latest is None:
             reasons.append("no quarterly inspection on record")
         else:
@@ -228,14 +240,14 @@ class MaintenanceRegister:
     def may_go_out(self, serial: str, day: date) -> bool:
         return not self.reasons_not_to_use(serial, day)
 
-    def quarterly_due_by(self, serial: str) -> date | None:
-        latest = self.latest_quarterly(serial)
+    def quarterly_due_by(self, serial: str, on: date | None = None) -> date | None:
+        latest = self.latest_quarterly(serial, on)
         return latest.expires_on() if latest is not None else None
 
     def overdue_on(self, serials: tuple[str, ...], day: date) -> tuple[str, ...]:
         found = []
         for serial in serials:
-            due = self.quarterly_due_by(serial)
+            due = self.quarterly_due_by(serial, day)
             if due is None or day >= due:
                 found.append(serial)
         return tuple(sorted(found))

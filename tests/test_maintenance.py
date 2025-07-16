@@ -204,3 +204,41 @@ def test_the_history_of_one_device_reads_in_date_order():
 def test_a_record_falls_out_of_retention_after_three_years():
     strip = quarterly("D-77", STRIPPED, "0303")
     assert strip.destroy_after() == STRIPPED + timedelta(days=3 * 365)
+
+
+def test_a_quarterly_does_not_cover_the_day_before_it_was_done():
+    register = MaintenanceRegister()
+    register.record(quarterly("D-77", STRIPPED, "0303"))
+    day_before = STRIPPED - timedelta(days=1)
+    register.record(pre_use("D-77", day_before, "0142"))
+    assert not register.may_go_out("D-77", day_before)
+    assert "no quarterly inspection on record" in register.reasons_not_to_use("D-77", day_before)
+
+
+def test_the_day_it_was_done_is_covered():
+    register = MaintenanceRegister()
+    register.record(quarterly("D-77", STRIPPED, "0303"))
+    register.record(pre_use("D-77", STRIPPED, "0142"))
+    assert register.may_go_out("D-77", STRIPPED)
+
+
+def test_the_latest_quarterly_is_the_latest_as_of_the_day_asked_about():
+    register = MaintenanceRegister()
+    register.record(quarterly("D-77", STRIPPED, "0303"))
+    later = STRIPPED + timedelta(days=40)
+    register.record(quarterly("D-77", later, "0303"))
+    assert register.latest_quarterly("D-77", STRIPPED + timedelta(days=1)).performed_on == STRIPPED
+    assert register.latest_quarterly("D-77", later).performed_on == later
+    assert register.latest_quarterly("D-77").performed_on == later
+
+
+def test_the_next_due_date_is_answered_as_of_the_day_asked_about():
+    register = MaintenanceRegister()
+    register.record(quarterly("D-77", STRIPPED, "0303"))
+    assert register.quarterly_due_by("D-77", STRIPPED - timedelta(days=1)) is None
+
+
+def test_a_fleet_listing_does_not_credit_a_future_quarterly():
+    register = MaintenanceRegister()
+    register.record(quarterly("D-77", STRIPPED, "0303"))
+    assert register.overdue_on(("D-77",), STRIPPED - timedelta(days=1)) == ("D-77",)
