@@ -24,6 +24,10 @@ A sheet used to be three things in three places: a tuple of column names, a
 function that wrote the rows, and an entry in each of three lookups. Adding the
 file manifest meant editing four places and the first attempt edited three, so
 a sheet is now one Sheet object and the lookups are derived from the one list.
+
+The manifest went in as a function of its own the first time round, because
+the package did not carry the files. It does now, so it is a sheet like the
+rest and the special case is gone.
 """
 
 from __future__ import annotations
@@ -34,7 +38,6 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
 from qu_imager.errors import ValidationError
-from qu_imager.imaging.store import Manifest
 from qu_imager.quantities.length import Length
 from qu_imager.reporting.package import Package
 from qu_imager.reporting.statistics import Rate
@@ -94,6 +97,38 @@ def _radiograph_rows(package: Package) -> Iterable[Row]:
             "yes" if line.admissible else "no",
             line.read_by or "",
             line.indications,
+        ]
+
+
+def _report_rows(package: Package) -> Iterable[Row]:
+    for report in package.reports:
+        yield [
+            report.reference,
+            report.item,
+            report.requirement,
+            str(report.disposition) if report.disposition else "",
+            report.concession,
+            report.removal,
+            report.raised_on.isoformat(),
+            report.raised_by,
+            report.closed_on.isoformat() if report.closed_on else "",
+            report.closed_by,
+        ]
+
+
+def _file_rows(package: Package) -> Iterable[Row]:
+    for image in package.files:
+        yield [
+            image.filename,
+            image.radiograph_number,
+            str(image.image_format),
+            str(image.purpose),
+            image.revision,
+            image.bit_depth,
+            image.width,
+            image.height,
+            image.byte_size,
+            image.digest,
         ]
 
 
@@ -157,6 +192,38 @@ SHEETS = (
         ),
         _summary_rows,
     ),
+    Sheet(
+        "reports",
+        (
+            "reference",
+            "item",
+            "requirement",
+            "disposition",
+            "concession",
+            "removal",
+            "raised_on",
+            "raised_by",
+            "closed_on",
+            "closed_by",
+        ),
+        _report_rows,
+    ),
+    Sheet(
+        "files",
+        (
+            "filename",
+            "radiograph",
+            "format",
+            "purpose",
+            "revision",
+            "bit_depth",
+            "width",
+            "height",
+            "bytes",
+            "sha256",
+        ),
+        _file_rows,
+    ),
 )
 
 BY_NAME = {sheet.name: sheet for sheet in SHEETS}
@@ -187,46 +254,3 @@ def to_files(package: Package) -> dict[str, str]:
 
 def columns_of(what: str) -> Iterable[str]:
     return sheet_named(what).columns
-
-
-MANIFEST_COLUMNS = (
-    "filename",
-    "radiograph",
-    "format",
-    "purpose",
-    "revision",
-    "bit_depth",
-    "width",
-    "height",
-    "bytes",
-    "sha256",
-)
-
-
-def manifest_to_text(manifest: Manifest) -> str:
-    """The file manifest, which travels with the images and not with the package.
-
-    It is written from the manifest rather than the package because the two are
-    assembled from different things and a job can have a complete package and
-    no images at all, which is every film job the shop has ever done.
-    """
-    stream = io.StringIO()
-    writer = csv.writer(stream, lineterminator="\n")
-    writer.writerow(MANIFEST_COLUMNS)
-    for name in sorted(manifest.entries):
-        image = manifest.entries[name]
-        writer.writerow(
-            [
-                image.filename,
-                image.radiograph_number,
-                str(image.image_format),
-                str(image.purpose),
-                image.revision,
-                image.bit_depth,
-                image.width,
-                image.height,
-                image.byte_size,
-                image.digest,
-            ]
-        )
-    return stream.getvalue()

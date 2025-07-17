@@ -87,14 +87,18 @@ def test_the_traceability_command_says_so_when_nothing_is_broken(shop):
     assert shop("report", "traceability", "24-0001").output.strip() == "every chain holds"
 
 
-def test_the_export_writes_three_files_and_names_them(tmp_path, shop):
+def test_the_export_writes_a_file_for_every_sheet_and_names_them(tmp_path, shop):
+    from qu_imager.reporting.exports import sheets
+
     into = tmp_path / "out"
     output = shop("report", "export", "24-0001", "--into", str(into)).output
     written = [line.strip() for line in output.splitlines() if line.strip()]
-    assert len(written) == 3
+    assert len(written) == len(sheets())
     for name in written:
         assert name.endswith(".csv")
     assert (into / "24-0001-summary.csv").exists()
+    assert (into / "24-0001-reports.csv").exists()
+    assert (into / "24-0001-files.csv").exists()
 
 
 def test_the_export_makes_the_directory_if_it_is_not_there(tmp_path, shop):

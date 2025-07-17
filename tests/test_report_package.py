@@ -236,3 +236,95 @@ def test_a_rate_on_a_handful_of_welds_says_so_rather_than_a_percentage():
         rate = assemble(work, job).repair_rate()
     assert not rate.is_reportable
     assert rate.describe() == "1 of 2, too few to rate"
+
+
+def test_the_package_carries_the_reports_raised_against_the_job():
+    from qu_imager.nonconformance import Report
+
+    made = database()
+    with transaction(made) as work:
+        job = a_job(work)
+        work.nonconformances.raise_report(
+            Report(
+                reference="NCR-1",
+                job=str(job),
+                item="GW-104",
+                requirement="API 1104 9.3.8",
+                account="elongated slag",
+                raised_on=OPENED,
+                raised_by="0142",
+            )
+        )
+        package = assemble(work, job)
+    assert [r.reference for r in package.reports] == ["NCR-1"]
+    assert "NCR-1 is still open" in package.faults
+
+
+def test_another_jobs_reports_are_not_on_this_package():
+    from qu_imager.nonconformance import Report
+
+    made = database()
+    with transaction(made) as work:
+        job = a_job(work)
+        work.nonconformances.raise_report(
+            Report(
+                reference="NCR-1",
+                job="24-9999",
+                item="GW-104",
+                requirement="API 1104",
+                account="slag",
+                raised_on=OPENED,
+                raised_by="0142",
+            )
+        )
+        package = assemble(work, job)
+    assert package.reports == ()
+
+
+def test_the_package_carries_the_files_in_name_order():
+    from datetime import datetime
+
+    from qu_imager.imaging.store import (
+        Format,
+        Purpose,
+        StoredImage,
+        digest_of,
+        expected_name,
+    )
+
+    made = database()
+    with transaction(made) as work:
+        job = a_job(work)
+        a_weld(work, job)
+        number = shoot(work, job)
+        record_reading(work, ReadingRecord(number, a_reader(), READ))
+        for revision, image_format, purpose, bits in (
+            (1, Format.JPEG, Purpose.VIEWING, 8),
+            (0, Format.DICONDE, Purpose.RECORD, 16),
+        ):
+            work.store.ingest(
+                StoredImage(
+                    radiograph_number=number,
+                    filename=expected_name(number, image_format, revision),
+                    image_format=image_format,
+                    bit_depth=bits,
+                    width=2048,
+                    height=512,
+                    byte_size=512,
+                    digest=digest_of(f"{number}-{revision}".encode()),
+                    captured_at=datetime(2024, 11, 3, 22, 0),
+                    purpose=purpose,
+                ),
+                READ,
+                "0142",
+            )
+        package = assemble(work, job)
+    names = [image.filename for image in package.files]
+    assert names == sorted(names)
+    assert len(names) == 2
+
+
+def test_a_job_with_no_files_carries_none():
+    made = database()
+    with transaction(made) as work:
+        assert assemble(work, a_job(work)).files == ()

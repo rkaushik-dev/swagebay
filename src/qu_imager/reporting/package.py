@@ -28,7 +28,9 @@ from datetime import date
 from qu_imager.evaluation.acceptance import Code, Verdict, judge
 from qu_imager.evaluation.indication import IndicationSet
 from qu_imager.identity import JobNumber, WeldId
+from qu_imager.imaging.store import StoredImage
 from qu_imager.naming import code_named
+from qu_imager.nonconformance import Report
 from qu_imager.persistence.models.work import WeldRow
 from qu_imager.persistence.unit_of_work import UnitOfWork
 from qu_imager.persistence.work_mapper import row_to_indication
@@ -77,6 +79,8 @@ class Package:
     welds: tuple[WeldLine, ...]
     radiographs: tuple[RadiographLine, ...]
     faults: tuple[str, ...]
+    reports: tuple[Report, ...] = ()
+    files: tuple[StoredImage, ...] = ()
 
     @property
     def is_complete(self) -> bool:
@@ -157,6 +161,17 @@ def assemble(work: UnitOfWork, number: JobNumber) -> Package:
     if not row.welds:
         faults.append("the job has no welds on it")
 
+    # The reports and the files come from their own registers rather than
+    # off the job row, and they are gathered here so that everything the
+    # client is sent is assembled in one place and can be counted once.
+    reports = work.nonconformances.for_job(str(number))
+    for report in reports:
+        if report.is_open:
+            faults.append(f"{report.reference} is still open")
+    manifest = work.store.manifest_for(number)
+    files = tuple(manifest.entries[name] for name in sorted(manifest.entries))
+    faults.extend(manifest.faults())
+
     return Package(
         job=number,
         client=row.client,
@@ -168,6 +183,8 @@ def assemble(work: UnitOfWork, number: JobNumber) -> Package:
         welds=tuple(weld_lines),
         radiographs=tuple(radiograph_lines),
         faults=tuple(faults),
+        reports=reports,
+        files=files,
     )
 
 
