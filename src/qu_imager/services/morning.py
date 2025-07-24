@@ -23,7 +23,7 @@ from datetime import date, timedelta
 
 from qu_imager.persistence.source_mapper import row_to_source
 from qu_imager.persistence.unit_of_work import UnitOfWork
-from qu_imager.services.dispatch import clearance
+from qu_imager.services.dispatch import Yard, clearance
 
 THIS_WEEK = 7
 
@@ -69,15 +69,15 @@ def sheet_for(work: UnitOfWork, day: date) -> Sheet:
     week: list[Line] = []
     late: list[Line] = []
 
-    for device in work.sources.devices():
-        register = work.maintenance.register_for((device.serial,))
-        due = register.quarterly_due_by(device.serial)
+    yard = Yard.load(work)
+    for serial in sorted(yard.devices):
+        due = yard.register.quarterly_due_by(serial, day)
         if due is None:
-            today.append(Line("today", device.serial, "no quarterly inspection on record"))
+            today.append(Line("today", serial, "no quarterly inspection on record"))
         elif day >= due:
-            today.append(Line("today", device.serial, f"quarterly ran out on {due}"))
+            today.append(Line("today", serial, f"quarterly ran out on {due}"))
         elif due - day <= timedelta(days=THIS_WEEK):
-            week.append(Line("this week", device.serial, f"quarterly due by {due}"))
+            week.append(Line("this week", serial, f"quarterly due by {due}"))
 
     for row in work.sources.in_service():
         source = row_to_source(row)
@@ -109,11 +109,12 @@ def sheet_for(work: UnitOfWork, day: date) -> Sheet:
 
 def loads_ready(work: UnitOfWork, day: date) -> tuple[tuple[str, str], ...]:
     """Every device and source pairing that could actually leave today."""
+    yard = Yard.load(work)
     ready = []
-    for device in work.sources.devices():
-        for source in work.sources.in_service():
-            if clearance(work, device.serial, source.serial, day, (), "yard").cleared:
-                ready.append((device.serial, source.serial))
+    for device in sorted(yard.devices):
+        for serial in sorted(yard.sources):
+            if clearance(work, device, serial, day, (), "yard", yard).cleared:
+                ready.append((device, serial))
     return tuple(sorted(ready))
 
 

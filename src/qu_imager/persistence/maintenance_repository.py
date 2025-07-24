@@ -1,5 +1,10 @@
 """Reading and writing inspections, and handing back a register to ask.
 
+The defects are loaded with the inspections rather than behind them. Every
+caller reads them, because whether an inspection passed is a question about
+its defects, so a lazy load here is a guaranteed second query per row and it
+was showing up as twelve queries to check six cameras.
+
 The register is a domain object with the whole fleet's history in it, and it is
 built here from rows for one device or one set of devices. Building it for the
 devices actually being asked about rather than for everything is the difference
@@ -10,7 +15,7 @@ the end of the second year.
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from qu_imager.errors import ValidationError
 from qu_imager.persistence.models.maintenance import DefectRow, InspectionRow
@@ -67,6 +72,7 @@ class MaintenanceRepository:
     def for_device(self, serial: str) -> tuple[Inspection, ...]:
         rows = self.session.scalars(
             select(InspectionRow)
+            .options(selectinload(InspectionRow.defects))
             .where(InspectionRow.device_serial == serial)
             .order_by(InspectionRow.performed_on, InspectionRow.id)
         ).all()
@@ -77,6 +83,7 @@ class MaintenanceRepository:
             return MaintenanceRegister()
         rows = self.session.scalars(
             select(InspectionRow)
+            .options(selectinload(InspectionRow.defects))
             .where(InspectionRow.device_serial.in_(serials))
             .order_by(InspectionRow.performed_on, InspectionRow.id)
         ).all()

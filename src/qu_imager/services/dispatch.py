@@ -26,9 +26,38 @@ from datetime import date
 
 from qu_imager.clock import start_of
 from qu_imager.errors import ConflictError, NotFoundError
+from qu_imager.persistence.models.sources import SourceRow
 from qu_imager.persistence.source_mapper import row_to_source
 from qu_imager.persistence.unit_of_work import UnitOfWork
 from qu_imager.personnel import Person
+from qu_imager.safety.maintenance import MaintenanceRegister
+
+
+@dataclass(frozen=True, slots=True)
+class Yard:
+    """Everything the gate needs about the whole shop, read once.
+
+    Asking about one load is three small queries and that is fine. Asking about
+    every pairing in the yard through the same path was three per pairing, so
+    six cameras and four sources cost seventy two round trips to read ten rows.
+    This is those ten rows.
+    """
+
+    register: MaintenanceRegister
+    devices: frozenset[str]
+    sources: dict[str, SourceRow]
+    out: frozenset[str]
+
+    @classmethod
+    def load(cls, work: UnitOfWork) -> Yard:
+        devices = work.sources.devices()
+        serials = tuple(row.serial for row in devices)
+        return cls(
+            register=work.maintenance.register_for(serials),
+            devices=frozenset(serials),
+            sources={row.serial: row for row in work.sources.in_service()},
+            out=work.sources.open_trip_serials(),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,10 +92,16 @@ def clearance(
     day: date,
     crew: tuple[Person, ...] = (),
     lead_badge: str = "",
+    yard: Yard | None = None,
 ) -> Clearance:
-    """Ask all three questions at once and hand back every answer."""
-    source_reasons = _source_reasons(work, source_serial, day)
-    device_reasons = _device_reasons(work, device_serial, day)
+    """Ask all three questions at once and hand back every answer.
+
+    The yard can be handed in already read. Asking about one load without it
+    is three small queries and that is right. Asking about every load in the
+    yard through the same path was three per pairing.
+    """
+    source_reasons = _source_reasons(work, source_serial, day, yard)
+    device_reasons = _device_reasons(work, device_serial, day, yard)
     crew_reasons = _crew_reasons(crew, day, lead_badge)
     return Clearance(
         device_serial=device_serial,
@@ -78,21 +113,27 @@ def clearance(
     )
 
 
-def _source_reasons(work: UnitOfWork, serial: str, day: date) -> tuple[str, ...]:
-    row = work.sources.find(serial)
+def _source_reasons(
+    work: UnitOfWork, serial: str, day: date, yard: Yard | None = None
+) -> tuple[str, ...]:
+    row = yard.sources.get(serial) if yard is not None else work.sources.find(serial)
     if row is None:
         return (f"source {serial} is not on the inventory",)
     at = start_of(day)
     reasons = row_to_source(row).reasons_not_to_use(at)
-    if work.sources.open_trip(serial) is not None:
+    is_out = serial in yard.out if yard is not None else work.sources.open_trip(serial)
+    if is_out:
         reasons = (*reasons, f"source {serial} is already out")
     return tuple(f"source {serial}: {reason}" for reason in reasons)
 
 
-def _device_reasons(work: UnitOfWork, serial: str, day: date) -> tuple[str, ...]:
-    if work.sources.find_device(serial) is None:
+def _device_reasons(
+    work: UnitOfWork, serial: str, day: date, yard: Yard | None = None
+) -> tuple[str, ...]:
+    known = serial in yard.devices if yard is not None else work.sources.find_device(serial)
+    if not known:
         return (f"device {serial} is not on the inventory",)
-    register = work.maintenance.register_for((serial,))
+    register = yard.register if yard is not None else work.maintenance.register_for((serial,))
     return tuple(
         f"device {serial}: {reason}" for reason in register.reasons_not_to_use(serial, day)
     )
@@ -139,9 +180,10 @@ def cleared_devices(
     devices = work.sources.devices()
     if not devices:
         raise NotFoundError("device", "any")
+    yard = Yard.load(work)
     found = [
         row.serial
         for row in devices
-        if clearance(work, row.serial, source_serial, day, crew, "listing").cleared
+        if clearance(work, row.serial, source_serial, day, crew, "listing", yard).cleared
     ]
     return tuple(sorted(found))

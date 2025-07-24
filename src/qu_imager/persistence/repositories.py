@@ -22,7 +22,7 @@ from __future__ import annotations
 from datetime import date
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from qu_imager.errors import NotFoundError, ValidationError
 from qu_imager.identity import JobNumber, WeldId
@@ -48,9 +48,18 @@ class SourceRepository:
         return found
 
     def in_service(self) -> tuple[SourceRow, ...]:
+        """Every source that can go out, with its wipe tests already loaded.
+
+        Whether a source is fit is a question about its last wipe test, so
+        every caller of this walks the relationship. Leaving it lazy made the
+        morning sheet read once per source and the count grew with the shop.
+        """
         return tuple(
             self.session.scalars(
-                select(SourceRow).where(SourceRow.state == "in service").order_by(SourceRow.serial)
+                select(SourceRow)
+                .options(selectinload(SourceRow.leak_tests))
+                .where(SourceRow.state == "in service")
+                .order_by(SourceRow.serial)
             ).all()
         )
 
@@ -59,6 +68,15 @@ class SourceRepository:
         return self.session.scalars(
             select(TripRow).where(TripRow.source_id == source.id, TripRow.came_back.is_(None))
         ).one_or_none()
+
+    def open_trip_serials(self) -> frozenset[str]:
+        """Every source that is out, in one query rather than one each."""
+        rows = self.session.execute(
+            select(SourceRow.serial)
+            .join(TripRow, TripRow.source_id == SourceRow.id)
+            .where(TripRow.came_back.is_(None))
+        ).all()
+        return frozenset(serial for (serial,) in rows)
 
     def find_device(self, serial: str) -> DeviceRow | None:
         return self.session.scalars(
