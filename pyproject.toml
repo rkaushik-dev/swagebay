@@ -35,6 +35,11 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# The type marker is data, not a module, so it has to be named or it is
+# quietly left out of the wheel and every consumer sees an untyped package.
+[tool.setuptools.package-data]
+qu_imager = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
