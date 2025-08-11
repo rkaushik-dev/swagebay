@@ -19,19 +19,10 @@ import click
 from qu_imager.cli.gates import as_day, report
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import bullets, heading, table
-from qu_imager.errors import ValidationError
+from qu_imager.naming import disposition_named
 from qu_imager.nonconformance import Disposition, Report
 
 DISPOSITIONS = tuple(d.name.lower() for d in Disposition)
-
-
-def _disposition(key: str) -> Disposition:
-    try:
-        return Disposition[key.strip().upper().replace(" ", "_").replace("-", "_")]
-    except KeyError:
-        raise ValidationError(
-            "nothing here dispositions like that", given=key, known=", ".join(DISPOSITIONS)
-        ) from None
 
 
 def _rows(reports: tuple[Report, ...], on: date) -> list[list[str]]:
@@ -99,7 +90,7 @@ def decide_command(
     """Set the disposition, with the paperwork it needs."""
     with work_for(ctx) as work:
         report = work.nonconformances.decide(
-            reference, _disposition(disposition), concession, removal
+            reference, disposition_named(disposition), concession, removal
         )
     click.echo(report.describe())
 

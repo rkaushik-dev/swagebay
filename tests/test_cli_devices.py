@@ -93,7 +93,7 @@ def test_an_item_nothing_inspects_is_refused_with_the_ones_that_exist(shop):
         "flux_capacitor:humming",
     )
     assert isinstance(result.exception, ValidationError)
-    assert "drive_cable" in result.exception.context["known"]
+    assert "drive cable" in result.exception.context["known"]
 
 
 def test_a_defect_with_no_account_is_refused(shop):

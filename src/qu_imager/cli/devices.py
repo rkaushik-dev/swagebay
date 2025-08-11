@@ -20,17 +20,14 @@ from qu_imager.cli.gates import as_day, report
 from qu_imager.cli.main import cli, work_for
 from qu_imager.cli.render import bullets, heading, table
 from qu_imager.errors import ValidationError
-from qu_imager.safety.maintenance import Defect, Item, pre_use, quarterly
+from qu_imager.naming import item_named
+from qu_imager.safety.maintenance import Defect, pre_use, quarterly
 
 
 def _defect(text: str) -> Defect:
+    """One item:account pair from the command line, as a defect."""
     item, _, account = text.partition(":")
-    key = item.strip().upper().replace(" ", "_").replace("-", "_")
-    try:
-        found = Item[key]
-    except KeyError:
-        known = ", ".join(sorted(i.name.lower() for i in Item))
-        raise ValidationError("nothing here inspects that", item=item, known=known) from None
+    found = item_named(item)
     if not account.strip():
         raise ValidationError("a defect says what is wrong with it", item=str(found))
     return Defect(found, account.strip())

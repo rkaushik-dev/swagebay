@@ -14,20 +14,10 @@ from fastapi import APIRouter, status
 
 from qu_imager.api.app import Work
 from qu_imager.api.schemas import CloseIn, DecisionIn, ReportIn, ReportOut
-from qu_imager.errors import ValidationError
-from qu_imager.nonconformance import Disposition, Report
+from qu_imager.naming import disposition_named
+from qu_imager.nonconformance import Report
 
 router = APIRouter(prefix="/nonconformances", tags=["nonconformance"])
-
-
-def _disposition(key: str) -> Disposition:
-    try:
-        return Disposition[key.strip().upper().replace(" ", "_").replace("-", "_")]
-    except KeyError:
-        known = ", ".join(d.name.lower() for d in Disposition)
-        raise ValidationError(
-            "nothing here dispositions like that", given=key, known=known
-        ) from None
 
 
 def _out(report: Report, on: date) -> ReportOut:
@@ -78,7 +68,7 @@ def read_report(reference: str, work: Work, on: date | None = None) -> ReportOut
 @router.post("/{reference}/decision")
 def decide(reference: str, body: DecisionIn, work: Work) -> ReportOut:
     report = work.nonconformances.decide(
-        reference, _disposition(body.disposition), body.concession, body.removal
+        reference, disposition_named(body.disposition), body.concession, body.removal
     )
     return _out(report, date.today())
 

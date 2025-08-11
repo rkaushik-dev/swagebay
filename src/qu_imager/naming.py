@@ -12,6 +12,13 @@ So they live here, they all behave the same way, and they all accept both the
 published value and the member name. That last part is the behaviour that was
 right, and it is now right everywhere rather than in one place by accident.
 
+Three more copies turned up later, on the cli and the api, for the two enums
+the registers added. Both of those hand tolerate an underscored member name,
+which is what a caller types, so that is folded in here rather than being a
+fourth dialect. An enum that carries a label alongside its value publishes
+the label, because the value of one of them is a tuple and nobody types a
+tuple.
+
 Every one refuses rather than defaulting. A name nobody publishes is a typo or
 a stale integration, and quietly picking the first entry is how a job ends up
 worked to a code nobody chose.
@@ -27,20 +34,29 @@ from qu_imager.evaluation.acceptance import Code
 from qu_imager.evaluation.taxonomy import Kind
 from qu_imager.geometry.shot import ShotType
 from qu_imager.imaging.selection import IndicatorSide, TechniqueClass
+from qu_imager.nonconformance import Disposition
+from qu_imager.safety.maintenance import Item
 
 E = TypeVar("E", bound=Enum)
 
 
+def published(member: Enum) -> str:
+    """What a caller would type for one member, which is not always its value."""
+    label = getattr(member, "label", None)
+    return str(label) if isinstance(label, str) else str(member.value)
+
+
 def named(kind: type[E], value: str, what: str) -> E:
-    """The member whose value or name matches, or a refusal naming both."""
+    """The member whose value, label or name matches, or a refusal naming all."""
     wanted = value.strip()
+    folded = wanted.lower().replace(" ", "_").replace("-", "_")
     for member in kind:
-        if str(member.value) == wanted or member.name.lower() == wanted.lower():
+        if published(member) == wanted or member.name.lower() in (wanted.lower(), folded):
             return member
     raise ValidationError(
         f"no {what} by that name",
         given=value,
-        known=", ".join(str(m.value) for m in kind),
+        known=", ".join(published(m) for m in kind),
     )
 
 
@@ -66,13 +82,13 @@ def technique_class_named(value: str) -> TechniqueClass:
 
 
 def kind_named(value: str) -> Kind:
-    """A discontinuity, which is named by its code rather than its description."""
-    wanted = value.strip().upper()
-    for member in Kind:
-        if member.name == wanted:
-            return member
-    raise ValidationError(
-        "no discontinuity code by that name",
-        given=value,
-        known=", ".join(m.name for m in Kind),
-    )
+    """A discontinuity, named by its code and now also by its description."""
+    return named(Kind, value, "discontinuity code")
+
+
+def disposition_named(value: str) -> Disposition:
+    return named(Disposition, value, "disposition")
+
+
+def item_named(value: str) -> Item:
+    return named(Item, value, "inspection item")

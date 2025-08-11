@@ -238,7 +238,7 @@ def test_an_item_nothing_inspects_is_a_422(api):
         },
     )
     assert response.status_code == 422
-    assert "drive_cable" in response.json()["context"]["known"]
+    assert "drive cable" in response.json()["context"]["known"]
 
 
 def test_a_devices_inspections_read_in_date_order(api):

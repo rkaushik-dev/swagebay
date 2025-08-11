@@ -17,24 +17,16 @@ from fastapi import APIRouter, status
 
 from qu_imager.api.app import Work
 from qu_imager.api.schemas import ClearanceOut, InspectionIn, InspectionOut
-from qu_imager.errors import ValidationError
-from qu_imager.safety.maintenance import Defect, Item, pre_use, quarterly
+from qu_imager.naming import item_named
+from qu_imager.safety.maintenance import Defect, pre_use, quarterly
 from qu_imager.services.dispatch import clearance
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
 
-def _item(key: str) -> Item:
-    try:
-        return Item[key.strip().upper().replace(" ", "_").replace("-", "_")]
-    except KeyError:
-        known = ", ".join(sorted(i.name.lower() for i in Item))
-        raise ValidationError("nothing here inspects that", item=key, known=known) from None
-
-
 @router.post("/{serial}/inspections", status_code=status.HTTP_201_CREATED)
 def record_inspection(serial: str, body: InspectionIn, work: Work) -> InspectionOut:
-    defects = tuple(Defect(_item(d.item), d.account) for d in body.defects)
+    defects = tuple(Defect(item_named(d.item), d.account) for d in body.defects)
     build = quarterly if body.is_quarterly else pre_use
     inspection = build(serial, body.performed_on, body.performed_by, defects, body.notes)
     work.maintenance.record(inspection)
