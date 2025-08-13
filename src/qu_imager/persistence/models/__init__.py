@@ -25,6 +25,7 @@ from qu_imager.persistence.models.safety import (
     SurveyPointRow,
     SurveyRow,
 )
+from qu_imager.persistence.models.shop import ExchangeRow, UseRow
 from qu_imager.persistence.models.sources import (
     DeviceRow,
     LeakTestRow,
@@ -49,6 +50,7 @@ __all__ = [
     "FiledRow",
     "DeviceRow",
     "DoseEntryRow",
+    "ExchangeRow",
     "DosimeterRow",
     "FilmRow",
     "IncidentRow",
@@ -68,5 +70,6 @@ __all__ = [
     "SurveyPointRow",
     "SurveyRow",
     "TripRow",
+    "UseRow",
     "WeldRow",
 ]

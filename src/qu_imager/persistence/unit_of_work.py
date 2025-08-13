@@ -47,6 +47,7 @@ from qu_imager.persistence.repositories import (
     SourceRepository,
     WeldRepository,
 )
+from qu_imager.persistence.shop_repository import ShopRepository
 from qu_imager.persistence.store_repository import StoreRepository
 
 
@@ -144,6 +145,7 @@ class UnitOfWork:
     store = Opened(StoreRepository)
     maintenance = Opened(MaintenanceRepository)
     nonconformances = Opened(NonconformanceRepository)
+    shop = Opened(ShopRepository)
 
     def __init__(self, factory: sessionmaker[Session]) -> None:
         self._factory = factory
