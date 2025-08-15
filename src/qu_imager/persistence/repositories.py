@@ -21,13 +21,14 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from qu_imager.errors import NotFoundError, ValidationError
 from qu_imager.identity import JobNumber, WeldId
 from qu_imager.persistence.models.sources import DeviceRow, SourceRow, TripRow
 from qu_imager.persistence.models.work import JobRow, RadiographRow, WeldRow
+from qu_imager.safety.inventory import Trip
 
 
 class SourceRepository:
@@ -68,6 +69,45 @@ class SourceRepository:
         return self.session.scalars(
             select(TripRow).where(TripRow.source_id == source.id, TripRow.came_back.is_(None))
         ).one_or_none()
+
+    def trips_between(self, since: date, until: date) -> tuple[Trip, ...]:
+        """Every trip that overlapped a window, as the domain object.
+
+        The overlap test is deliberately not an equality on the departure
+        date. A trip that went out in June and came back in July is a July
+        trip as far as the utilisation log is concerned, and a query keyed on
+        went_out alone silently drops it.
+        """
+        rows = self.session.execute(
+            select(
+                SourceRow.serial,
+                DeviceRow.serial,
+                TripRow.crew_badge,
+                TripRow.site,
+                TripRow.went_out,
+                TripRow.came_back,
+                TripRow.exposures,
+            )
+            .join(TripRow, TripRow.source_id == SourceRow.id)
+            .join(DeviceRow, DeviceRow.id == TripRow.device_id)
+            .where(
+                TripRow.went_out <= until,
+                or_(TripRow.came_back.is_(None), TripRow.came_back >= since),
+            )
+            .order_by(TripRow.went_out, TripRow.id)
+        ).all()
+        return tuple(
+            Trip(
+                source_serial=source,
+                device_serial=device,
+                crew_badge=badge,
+                site=site,
+                went_out=went,
+                came_back=back,
+                exposures=exposures,
+            )
+            for source, device, badge, site, went, back, exposures in rows
+        )
 
     def open_trip_serials(self) -> frozenset[str]:
         """Every source that is out, in one query rather than one each."""

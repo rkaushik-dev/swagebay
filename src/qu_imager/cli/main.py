@@ -116,6 +116,7 @@ def load_commands() -> None:
         registers,
         reports,
         safety,
+        shop,
         sources,
         store,
         technique,

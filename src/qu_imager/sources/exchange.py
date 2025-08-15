@@ -30,8 +30,9 @@ copied.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime
 
+from qu_imager.clock import midnight_like
 from qu_imager.errors import ConflictError, ValidationError
 from qu_imager.quantities.activity import Activity
 from qu_imager.safety.inventory import DeviceUnit
@@ -181,7 +182,7 @@ class Loading:
                 named=exchange.installed_serial or "nothing",
                 given=installed.serial,
             )
-        at = _instant(exchange.performed_on)
+        at = _instant(exchange.performed_on, installed.certificate.assay_at)
         if not installed.leak_test_current_at(at):
             raise ConflictError(
                 "a source with no current wipe test goes into a package, not a device",
@@ -192,21 +193,21 @@ class Loading:
         device.model.check_load(installed.isotope, installed.activity_at(at))
 
 
-def _instant(day: date) -> datetime:
-    """Midnight universal time on an exchange day.
+def _instant(day: date, like: datetime) -> datetime:
+    """Midnight on an exchange day, of the same kind as the source it is for.
 
     An exchange is recorded as a date because that is what the paperwork
-    carries, and decay wants an instant. Midnight utc is the one reading of a
-    date that does not depend on where the shop is, and the error it puts on a
-    seventy four day half life is under a tenth of a percent.
+    carries, and decay wants an instant. Which instant depends on whether the
+    certificate in hand carries a timezone, and a source read from the
+    database does not while one built in a test does.
     """
-    return datetime.combine(day, time.min, tzinfo=UTC)
+    return midnight_like(day, like)
 
 
 def activity_lost(source: SealedSource, went_in: date, came_out: date) -> Activity:
     """How much of a source's activity a device used up over its time in."""
     if came_out < went_in:
         raise ValidationError("a source cannot come out before it went in")
-    start = _instant(went_in)
-    end = _instant(came_out)
+    start = _instant(went_in, source.certificate.assay_at)
+    end = _instant(came_out, source.certificate.assay_at)
     return source.activity_at(start) - source.activity_at(end)

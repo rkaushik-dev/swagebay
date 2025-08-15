@@ -195,3 +195,42 @@ def test_the_end_of_a_day_is_inside_it_and_the_next_midnight_is_not():
     day = date(2025, 4, 14)
     assert within(end_of(day), day)
     assert not within(start_of(date(2025, 4, 15)), day)
+
+
+def test_midnight_matches_a_naive_moment():
+    from datetime import date, datetime
+
+    from qu_imager.clock import midnight_like
+
+    at = midnight_like(date(2025, 8, 19), datetime(2024, 1, 1))
+    assert at == datetime(2025, 8, 19, 0, 0)
+    assert at.tzinfo is None
+
+
+def test_midnight_matches_an_aware_moment():
+    from datetime import UTC, date, datetime
+
+    from qu_imager.clock import midnight_like
+
+    at = midnight_like(date(2025, 8, 19), datetime(2024, 1, 1, tzinfo=UTC))
+    assert at.tzinfo is UTC
+    assert at.hour == 0
+
+
+def test_midnight_carries_the_offset_it_was_given_not_utc():
+    from datetime import date, datetime, timedelta, timezone
+
+    from qu_imager.clock import midnight_like
+
+    atlantic = timezone(timedelta(hours=-4))
+    at = midnight_like(date(2025, 8, 19), datetime(2024, 1, 1, tzinfo=atlantic))
+    assert at.utcoffset() == timedelta(hours=-4)
+
+
+def test_a_midnight_matched_to_a_moment_can_always_be_compared_with_it():
+    from datetime import UTC, date, datetime
+
+    from qu_imager.clock import midnight_like
+
+    for other in (datetime(2024, 1, 1), datetime(2024, 1, 1, tzinfo=UTC)):
+        assert midnight_like(date(2025, 8, 19), other) > other

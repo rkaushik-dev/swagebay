@@ -101,6 +101,19 @@ def start_of(day: date) -> datetime:
     return datetime.combine(day, datetime.min.time())
 
 
+def midnight_like(day: date, other: datetime) -> datetime:
+    """Midnight on a day, of the same kind as a moment already in hand.
+
+    A date has no timezone and a source certificate might. Comparing them
+    means picking one, and picking wrong raises rather than answering, which
+    is how a source exchange typed at a terminal blew up against a source
+    read out of the database while the same code passed every unit test
+    against a source built in memory with a utc assay date.
+    """
+    at = start_of(day)
+    return at.replace(tzinfo=other.tzinfo) if is_aware(other) else at
+
+
 def end_of(day: date) -> datetime:
     return datetime.combine(day, datetime.max.time())
 
