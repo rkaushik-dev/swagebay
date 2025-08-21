@@ -87,6 +87,7 @@ def _install_routers(app: FastAPI) -> None:
         registers,
         reports,
         safety,
+        shop,
         sources,
         technique,
     )
@@ -94,6 +95,7 @@ def _install_routers(app: FastAPI) -> None:
     app.include_router(jobs.router)
     app.include_router(devices.router)
     app.include_router(nonconformance.router)
+    app.include_router(shop.router)
     app.include_router(sources.router)
     app.include_router(technique.router)
     app.include_router(radiographs.router)

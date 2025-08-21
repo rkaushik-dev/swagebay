@@ -170,7 +170,7 @@ class VerdictOut(BaseModel):
 
     code: str
     disposition: str
-    findings: tuple[FindingOut, ...]
+    findings: tuple[DoctorFindingOut, ...]
 
 
 class OutstandingOut(BaseModel):
@@ -639,3 +639,49 @@ class ReportOut(BaseModel):
     closed_by: str | None
     days_open: int
     overdue: bool
+
+
+class MorningOut(BaseModel):
+    """The morning, in the order it has to be worked through.
+
+    Not SheetOut. That name was already taken by the technique sheet, which
+    is a different sheet entirely, and two response models with one name is
+    an openapi document with one of them missing.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    day: date
+    stops_today: tuple[str, ...]
+    due_this_week: tuple[str, ...]
+    running_late: tuple[str, ...]
+    films_waiting: tuple[str, ...]
+    loads_ready: tuple[str, ...]
+    quiet: bool
+
+
+class ChecklistOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    job: str
+    clear: bool
+    work_reasons: tuple[str, ...]
+    report_reasons: tuple[str, ...]
+    image_reasons: tuple[str, ...]
+
+
+class DoctorFindingOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    check: str
+    subject: str
+    account: str
+
+
+class DoctorOut(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    checks_run: tuple[str, ...]
+    checks_available: tuple[str, ...]
+    healthy: bool
+    findings: tuple[DoctorFindingOut, ...]
