@@ -43,7 +43,16 @@ qu_imager = ["py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
-addopts = "-q"
+# There is deliberately no addopts here, and it is not an oversight.
+#
+# pytest works out verbosity by counting: -q takes one off and -v puts one on.
+# An addopts of "-q" is prepended to whatever the caller typed, so `pytest -v`
+# comes out at zero and prints no per test lines at all. Anything that reads
+# the run by parsing `path::name PASSED` out of the output then parses nothing,
+# and it does not look like a failure. It looks like a suite with no tests in
+# it, which is the same shape as a suite that passed.
+#
+# Callers that want the short output ask for it. CI does.
 filterwarnings = [
   # Starlette reaches for an anyio alias anyio has deprecated. Not ours to
   # fix and not worth reading on every run.
