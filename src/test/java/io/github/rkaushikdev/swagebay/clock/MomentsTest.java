@@ -5,13 +5,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.rkaushikdev.swagebay.ValidationError;
+import io.github.rkaushikdev.swagebay.persistence.UnitOfWork;
 import io.github.rkaushikdev.swagebay.quantities.Activity;
 import io.github.rkaushikdev.swagebay.scheduling.Window;
+import io.github.rkaushikdev.swagebay.services.DayLogService;
 import io.github.rkaushikdev.swagebay.sources.Decay;
 import io.github.rkaushikdev.swagebay.sources.Isotope;
 import io.github.rkaushikdev.swagebay.sources.Isotopes;
 import io.github.rkaushikdev.swagebay.util.Times;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -248,6 +251,19 @@ class MomentsTest {
     void aSiteWindowStillTakesWallClockTime() {
         Window window = new Window(NAIVE, NAIVE.plusHours(2));
         assertThat(window.length().ms()).isEqualTo(2 * 3600 * 1000);
+    }
+
+    /**
+     * The day log lists a day's shots by the wall clock day it is handed, through the shared slice
+     * of a day: from its start to its end, noon inside it.
+     */
+    @Test
+    void theDaySliceTheLogUsesIsTheSharedOne() throws NoSuchMethodException {
+        Method shotsOn = DayLogService.class.getMethod("shotsOn", UnitOfWork.class, LocalDate.class);
+        assertThat(Modifier.isStatic(shotsOn.getModifiers())).isTrue();
+        LocalDate day = LocalDate.of(2025, 4, 14);
+        assertThat(Moments.startOf(day)).isBefore(Moments.endOf(day));
+        assertThat(Moments.within(LocalDateTime.of(2025, 4, 14, 12, 0), day)).isTrue();
     }
 
     @Test
