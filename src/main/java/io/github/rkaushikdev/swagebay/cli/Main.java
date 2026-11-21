@@ -49,8 +49,12 @@ import picocli.CommandLine.ParseResult;
             JobCommands.class,
             MorningCommand.class,
             NonconformanceCommands.class,
+            RegisterCommands.class,
             SafetyCommands.class,
+            ShopCommands.class,
             SourceCommands.class,
+            StoreCommands.class,
+            TechniqueCommands.class,
             WeldCommands.class
         })
 public final class Main extends Group {

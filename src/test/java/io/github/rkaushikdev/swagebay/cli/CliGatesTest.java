@@ -6,11 +6,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
 class CliGatesTest {
@@ -75,6 +79,31 @@ class CliGatesTest {
         Answer result = run("not clear", List.of(Map.entry("", List.of("NCR-1 is still open"))));
         assertThat(result.output()).contains("NCR-1 is still open");
         assertThat(result.code()).isEqualTo(EXIT_NOT_CLEAR);
+    }
+
+    /** The names of every field a command group declares, its commands' fields included. */
+    private static Set<String> fieldsOf(Class<?> group) {
+        Set<String> names = new TreeSet<>();
+        Arrays.stream(group.getDeclaredFields()).map(Field::getName).forEach(names::add);
+        for (Class<?> nested : group.getDeclaredClasses()) {
+            names.addAll(fieldsOf(nested));
+        }
+        return names;
+    }
+
+    @Test
+    void everyGateInThePackageUsesTheOneExitStatus() {
+        assertThat(fieldsOf(Gates.class))
+                .as("the reading itself finds a status")
+                .contains("EXIT_NOT_CLEAR");
+        for (Class<?> group : List.of(
+                DeviceCommands.class, HistoryCommands.class, NonconformanceCommands.class, StoreCommands.class)) {
+            assertThat(fieldsOf(group))
+                    .as(group.getSimpleName())
+                    .isNotEmpty()
+                    .doesNotContain("EXIT_NOT_CLEARED", "EXIT_STORE_MISMATCH");
+        }
+        assertThat(EXIT_NOT_CLEAR).isEqualTo(4);
     }
 
     @Test
