@@ -6,6 +6,8 @@ import io.github.rkaushikdev.swagebay.api.routes.DeviceRoutes;
 import io.github.rkaushikdev.swagebay.api.routes.JobRoutes;
 import io.github.rkaushikdev.swagebay.api.routes.NonconformanceRoutes;
 import io.github.rkaushikdev.swagebay.api.routes.RadiographRoutes;
+import io.github.rkaushikdev.swagebay.api.routes.RegisterRoutes;
+import io.github.rkaushikdev.swagebay.api.routes.SafetyRoutes;
 import io.github.rkaushikdev.swagebay.api.routes.SourceRoutes;
 import io.github.rkaushikdev.swagebay.api.routes.TechniqueRoutes;
 import io.github.rkaushikdev.swagebay.persistence.Database;
@@ -79,6 +81,8 @@ public class SwagebayApplication implements WebMvcConfigurer {
         JobRoutes.class,
         NonconformanceRoutes.class,
         RadiographRoutes.class,
+        RegisterRoutes.class,
+        SafetyRoutes.class,
         SourceRoutes.class,
         TechniqueRoutes.class,
     })
