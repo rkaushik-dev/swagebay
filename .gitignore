@@ -12,3 +12,10 @@ dist/
 *.sqlite3
 qu_imager.sqlite3
 .hypothesis/
+# Java
+target/
+.idea/
+*.iml
+out/
+*.mv.db
+*.trace.db
