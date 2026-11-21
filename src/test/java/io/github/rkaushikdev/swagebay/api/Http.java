@@ -38,9 +38,9 @@ public final class Http {
         return send(withQuery(MockMvcRequestBuilders.post(path), query));
     }
 
-    /** {@code POST path} with {@code body} written as JSON. */
-    public Answer postJson(String path, Object body) {
-        return send(MockMvcRequestBuilders.post(path)
+    /** {@code POST path} with {@code body} written as JSON, and the query as alternating names and values. */
+    public Answer postJson(String path, Object body, String... query) {
+        return send(withQuery(MockMvcRequestBuilders.post(path), query)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(write(body)));
     }
