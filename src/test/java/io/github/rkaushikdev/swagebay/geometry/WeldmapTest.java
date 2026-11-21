@@ -162,6 +162,6 @@ class WeldmapTest {
 
     @Test
     void anArcPrintsTheWayTheSketchIsLabelled() {
-        assertThat(arc("2", 120, 130).describe()).isEqualTo("2 120° for 130°");
+        assertThat(arc("2", 120, 130).describe()).isEqualTo("2 120" + DEGREE + " for 130" + DEGREE);
     }
 }

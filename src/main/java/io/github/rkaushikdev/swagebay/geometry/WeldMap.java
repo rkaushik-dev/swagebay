@@ -32,8 +32,8 @@ public record WeldMap(List<Arc> arcs) {
     /** One turn, in degrees. */
     public static final BigDecimal FULL_CIRCLE = BigDecimal.valueOf(360);
 
-    /** The degree sign, U+00B0. */
-    public static final String DEGREE = "°";
+    /** The degree sign, U+00B0, written as a code point so the source stays plain ASCII. */
+    public static final String DEGREE = Character.toString(0x00B0);
 
     private static final BigDecimal DEFAULT_STEP = new BigDecimal("0.5");
     private static final BigDecimal DEFAULT_OVERLAP = BigDecimal.TEN;
