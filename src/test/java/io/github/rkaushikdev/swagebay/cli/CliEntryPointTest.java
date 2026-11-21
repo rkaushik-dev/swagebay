@@ -114,4 +114,10 @@ class CliEntryPointTest {
         assertThat(result.code()).isZero();
         assertThat(result.out()).contains(Swagebay.VERSION);
     }
+
+    @Test
+    void theHelpListsTheGroups() {
+        String output = new Shell().run("--help").out();
+        assertThat(output).contains("morning", "ncr");
+    }
 }

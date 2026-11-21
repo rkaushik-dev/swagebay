@@ -43,8 +43,12 @@ import picocli.CommandLine.ParseResult;
         subcommands = {
             CatalogueCommands.class,
             DeviceCommands.class,
+            DoctorCommand.class,
+            HistoryCommands.class,
             Main.Init.class,
             JobCommands.class,
+            MorningCommand.class,
+            NonconformanceCommands.class,
             SafetyCommands.class,
             SourceCommands.class,
             WeldCommands.class
@@ -76,6 +80,7 @@ public final class Main extends Group {
     public static final String DATABASE_VARIABLE = "SWAGEBAY_DATABASE";
 
     private static final String HELP = "Show this message and exit.";
+    private static final String H2 = "jdbc:h2:";
 
     private final Terminal terminal;
 
@@ -167,6 +172,31 @@ public final class Main extends Group {
             opened = Database.open(databaseUrl());
         }
         return opened;
+    }
+
+    /**
+     * The database opened so that nothing can be written to it, for a command that promises to
+     * change nothing. Closed when the command ends, as {@link #database()} is.
+     */
+    Database readingDatabase() {
+        if (opened == null) {
+            opened = Database.open(forReading(databaseUrl()));
+        }
+        return opened;
+    }
+
+    /**
+     * The URL that opens the same database with its files read only, where the driver can: an
+     * embedded H2 database. H2 rewrites part of its file every time it is opened for writing, even
+     * when nothing is written, so a command that only reads opens it this way and the file is left
+     * byte for byte as it was. A database in memory or behind a server is named as it is.
+     */
+    static String forReading(String url) {
+        boolean embedded = url.startsWith(H2)
+                && !url.startsWith(H2 + "mem:")
+                && !url.startsWith(H2 + "tcp:")
+                && !url.startsWith(H2 + "ssl:");
+        return embedded ? url + ";ACCESS_MODE_DATA=r" : url;
     }
 
     private CommandLine commandLine(List<? extends Subcommand> planted) {

@@ -39,6 +39,14 @@ abstract class Leaf implements Subcommand {
         return main().database().transactionResult(body);
     }
 
+    /**
+     * {@link #fromWork(Function)} against the database opened for reading only, for a command that
+     * promises to change nothing.
+     */
+    final <T> T fromReading(Function<? super UnitOfWork, ? extends T> body) {
+        return main().readingDatabase().transactionResult(body);
+    }
+
     /** A usage error against this command, which leaves with {@link Main#EXIT_VALIDATION}. */
     final ParameterException misused(String message) {
         return new ParameterException(spec.commandLine(), message);
