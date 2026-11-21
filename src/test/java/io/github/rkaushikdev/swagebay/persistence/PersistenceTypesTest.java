@@ -193,7 +193,7 @@ class PersistenceTypesTest {
      * mapping carries the name it gives.
      */
     @Test
-    void theNamingConventionIsSetOnTheBaseMetadata() {
+    void theNamingConventionIsSetOnTheSchema() {
         assertThat(Schema.NAMING_CONVENTION)
                 .containsExactly(
                         Map.entry("ix", "ix_{table}_{column}"),

@@ -318,7 +318,7 @@ class MigrationsTest {
     }
 
     @Test
-    void createAllAndTheMigrationsAgreeOnTheTableList() {
+    void theMappingAndTheMigrationsAgreeOnTheTableList() {
         assertThat(tablesIn(builtPool)).isNotEmpty().isEqualTo(tablesIn(migrated.dataSource()));
     }
 

@@ -123,8 +123,8 @@ public final class Database implements AutoCloseable {
         bean.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("hibernate.hbm2ddl.auto", ddl);
-        // Columns are laid out in the order they are declared, as the migrations lay them out,
-        // rather than by the size of their type.
+        // Columns, and the columns of a key, keep the order the mapping gives them rather than
+        // being reordered by the size of their type.
         properties.put("hibernate.column_ordering_strategy", "legacy");
         // Query parameters are not coerced into the type of the column they meet.
         properties.put("hibernate.jpa.compliance.load_by_id", "true");
