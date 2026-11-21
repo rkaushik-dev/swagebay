@@ -1,10 +1,18 @@
 package io.github.rkaushikdev.swagebay.clock;
 
+import static io.github.rkaushikdev.swagebay.quantities.Units.curie;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.rkaushikdev.swagebay.ValidationError;
+import io.github.rkaushikdev.swagebay.quantities.Activity;
+import io.github.rkaushikdev.swagebay.scheduling.Window;
+import io.github.rkaushikdev.swagebay.sources.Decay;
+import io.github.rkaushikdev.swagebay.sources.Isotope;
+import io.github.rkaushikdev.swagebay.sources.Isotopes;
 import io.github.rkaushikdev.swagebay.util.Times;
+import java.lang.reflect.Method;
+import java.lang.reflect.RecordComponent;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,6 +20,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoField;
 import java.time.temporal.Temporal;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -199,5 +208,52 @@ class MomentsTest {
             Temporal midnight = Moments.midnightLike(LocalDate.of(2025, 8, 19), other);
             assertThat(Moments.span(other, midnight).isPositive()).isTrue();
         }
+    }
+
+    /**
+     * Decay takes both of its moments as wall clock time, so an instant beside a wall clock time does
+     * not compile there, and where a moment of unknown kind arrives the shared guard refuses the pair.
+     */
+    @Test
+    void theDecayGuardIsTheSharedOneNow() {
+        List<Method> overloads = Arrays.stream(Decay.class.getMethods())
+                .filter(method -> method.getName().equals("activityOn"))
+                .toList();
+        assertThat(overloads).hasSize(1);
+        assertThat(overloads.get(0).getParameterTypes())
+                .containsExactly(Activity.class, LocalDateTime.class, Isotope.class, LocalDateTime.class);
+        assertThatThrownBy(() -> Moments.sameKind(AWARE, NAIVE))
+                .isInstanceOfSatisfying(ValidationError.class, caught -> {
+                    assertThat(caught.context().get("left_aware")).isEqualTo(true);
+                    assertThat(caught.context().get("right_aware")).isEqualTo(false);
+                });
+    }
+
+    /**
+     * A site window holds wall clock time, so an instant does not compile as either end of one, and
+     * where a moment of unknown kind arrives for a window the shared guard names the window.
+     */
+    @Test
+    void aSiteWindowRefusesAnInstantThroughTheSharedGuard() {
+        assertThat(Arrays.stream(Window.class.getRecordComponents())
+                        .filter(component -> component.getName().endsWith("At"))
+                        .map(RecordComponent::getType))
+                .containsExactly(LocalDateTime.class, LocalDateTime.class);
+        assertThatThrownBy(() -> Moments.requireNaive(AWARE, "site window"))
+                .isInstanceOfSatisfying(ValidationError.class, caught -> assertThat(caught.message())
+                        .contains("site window"));
+    }
+
+    @Test
+    void aSiteWindowStillTakesWallClockTime() {
+        Window window = new Window(NAIVE, NAIVE.plusHours(2));
+        assertThat(window.length().ms()).isEqualTo(2 * 3600 * 1000);
+    }
+
+    @Test
+    void aDecayBetweenTwoInstantsStillWorks() {
+        LocalDateTime assay = AWARE.toLocalDateTime();
+        Activity later = Decay.activityOn(curie(100), assay, Isotopes.IR192, assay.plusDays(74));
+        assertThat(later.curie()).isLessThan(curie(100).curie());
     }
 }
