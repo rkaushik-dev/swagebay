@@ -1,88 +1,32 @@
 package io.github.rkaushikdev.swagebay.persistence;
 
-import static io.github.rkaushikdev.swagebay.quantities.Units.mm;
+import static io.github.rkaushikdev.swagebay.testing.ServiceFixtures.prepared;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.rkaushikdev.swagebay.ConflictError;
 import io.github.rkaushikdev.swagebay.NotFoundError;
-import io.github.rkaushikdev.swagebay.geometry.PipeSchedule;
 import io.github.rkaushikdev.swagebay.identity.JobNumber;
-import io.github.rkaushikdev.swagebay.identity.WeldId;
 import io.github.rkaushikdev.swagebay.imaging.ImageFormat;
 import io.github.rkaushikdev.swagebay.imaging.ImageStore;
 import io.github.rkaushikdev.swagebay.imaging.Manifest;
 import io.github.rkaushikdev.swagebay.imaging.Purpose;
 import io.github.rkaushikdev.swagebay.imaging.StoredImage;
-import io.github.rkaushikdev.swagebay.materials.Materials;
-import io.github.rkaushikdev.swagebay.persistence.models.JobRow;
-import io.github.rkaushikdev.swagebay.persistence.models.RadiographRow;
 import io.github.rkaushikdev.swagebay.persistence.models.StoredImageRow;
-import io.github.rkaushikdev.swagebay.persistence.models.WeldRow;
+import io.github.rkaushikdev.swagebay.testing.ServiceFixtures.Prepared;
 import io.github.rkaushikdev.swagebay.testing.TestDatabase;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class StoreRepositoryTest {
 
-    private static final LocalDate OPENED = LocalDate.of(2024, 9, 23);
-    private static final LocalDateTime SHOT = LocalDateTime.of(2024, 9, 24, 23, 30);
     private static final LocalDateTime CAPTURED = LocalDateTime.of(2024, 9, 24, 23, 40);
     private static final LocalDateTime INGESTED = LocalDateTime.of(2024, 9, 25, 7, 0);
-    private static final WeldId WELD = WeldId.parse("GW-104");
     private static final String HASH = ImageStore.digestOf("plate one".getBytes(StandardCharsets.UTF_8));
     private static final String OTHER = ImageStore.digestOf("plate two".getBytes(StandardCharsets.UTF_8));
-
-    /** A job, what was shot on it, and the numbers the shots were given. */
-    private record Prepared(JobNumber job, List<String> numbers) {}
-
-    /**
-     * A job opened on the 23rd of September 2024, weld GW-104 on it, and {@code shots} exposures of
-     * that weld, numbered from the job's radiograph counter in this unit of work: the rows a job,
-     * a weld and recorded shots leave behind.
-     */
-    private static Prepared prepared(UnitOfWork work, int shots) {
-        int year = OPENED.getYear() % 100;
-        JobNumber number = new JobNumber(year, work.jobs().nextSerial(year));
-        JobRow job = new JobRow();
-        job.setYear(number.year());
-        job.setSerial(number.serial());
-        job.setClient("c");
-        job.setSite("s");
-        job.setAcceptanceCode("API 1104");
-        job.setProcedureNumber("RT-001");
-        job.setOpenedOn(OPENED);
-        WeldRow weld =
-                WorkMapper.jointToRow(PipeSchedule.girthWeld("6", "80", Materials.STEEL, mm(2)), WELD, new WeldRow());
-        weld.setWeldLength(mm(529));
-        weld.setWelder("w-19");
-        weld.setWeldedOn(OPENED);
-        job.addWeld(weld);
-        work.jobs().add(job);
-        List<String> numbers = new ArrayList<>();
-        for (int index = 1; index <= shots; index++) {
-            RadiographRow film = new RadiographRow();
-            film.setNumber(work.numbering().takeRadiographNumber(number.toString()));
-            film.setExposureIndex(index);
-            film.setExposedAt(SHOT);
-            film.setTechniqueReference("RT-001 rev 1");
-            film.setMedium("film");
-            film.setAdmissible(true);
-            weld.addRadiograph(film);
-            work.flush();
-            numbers.add(film.getNumber());
-        }
-        return new Prepared(number, List.copyOf(numbers));
-    }
-
-    private static Prepared prepared(UnitOfWork work) {
-        return prepared(work, 1);
-    }
 
     private static StoredImage anImage(
             String number, int revision, ImageFormat imageFormat, Purpose purpose, String digest) {

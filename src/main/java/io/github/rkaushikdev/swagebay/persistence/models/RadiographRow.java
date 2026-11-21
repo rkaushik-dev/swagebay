@@ -244,4 +244,12 @@ public class RadiographRow extends Keyed {
         indication.setRadiograph(this);
         indications.add(indication);
     }
+
+    /**
+     * Take every indication off this row, which deletes them when the work is flushed. A reread
+     * replaces the calls of the first reading this way, after the trail has what they were.
+     */
+    public void clearIndications() {
+        indications.clear();
+    }
 }
