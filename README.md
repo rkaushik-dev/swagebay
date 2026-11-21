@@ -1,5 +1,11 @@
 # swagebay
 
+[![CI](https://github.com/rkaushik-dev/swagebay/actions/workflows/ci.yml/badge.svg)](https://github.com/rkaushik-dev/swagebay/actions/workflows/ci.yml)
+![Java 21](https://img.shields.io/badge/Java-21-007396)
+![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F)
+![Maven](https://img.shields.io/badge/build-Maven-C71A36)
+![JUnit 5](https://img.shields.io/badge/tests-JUnit%205-25A162)
+
 Radiographic technique planning, image quality qualification and shop records
 for a code stamped NDT contractor. It plans the shot, decides whether the film
 or the plate is admissible, judges the weld against the code, keeps the safety
