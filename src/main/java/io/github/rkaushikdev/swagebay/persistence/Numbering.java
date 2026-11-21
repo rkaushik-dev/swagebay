@@ -20,7 +20,7 @@ import java.util.Optional;
  *
  * @param entityManager the entity manager of the unit of work the numbers are taken in
  */
-public record Numbering(EntityManager entityManager) {
+public record Numbering(EntityManager entityManager) implements Repository {
 
     /** The counter radiograph numbers are taken from, one per job. */
     public static final String RADIOGRAPH = "radiograph";
