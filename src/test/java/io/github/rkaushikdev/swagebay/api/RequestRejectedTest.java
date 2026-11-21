@@ -164,6 +164,16 @@ class RequestRejectedTest {
     }
 
     @Test
+    void aQueryValueTheRouteNeedsIsRequired() {
+        JsonNode problem = only(api.get("/devices/880D-221/clearance"));
+        assertThat(Http.asMap(problem))
+                .containsEntry("type", "missing")
+                .containsEntry("loc", List.of("query", "source"))
+                .containsEntry("msg", "Field required");
+        assertThat(problem.get("input").isNull()).isTrue();
+    }
+
+    @Test
     void aListWhereTheBodyObjectBelongsIsRefusedAtTheBody() {
         JsonNode problem = only(postRaw("[1]"));
         assertThat(Http.asMap(problem))

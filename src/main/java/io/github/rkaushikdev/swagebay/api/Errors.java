@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -106,6 +107,12 @@ public class Errors {
                     case null, default -> Problems.noBody();
                 };
         return rejected(new RequestRejected(List.of(problem)));
+    }
+
+    /** A query value the route needs, left out. */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> missing(MissingServletRequestParameterException failure) {
+        return rejected(new RequestRejected(List.of(Problems.noQueryValue(failure.getParameterName()))));
     }
 
     /** A query or path value that is not the kind the route takes. */

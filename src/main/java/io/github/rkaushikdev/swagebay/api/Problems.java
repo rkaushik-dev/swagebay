@@ -124,6 +124,11 @@ final class Problems {
         return new Problem("missing", List.of("body"), REQUIRED, null);
     }
 
+    /** A query value the route needs was not sent. */
+    static Problem noQueryValue(String name) {
+        return new Problem("missing", List.of("query", name), REQUIRED, null);
+    }
+
     /**
      * A value that is the wrong kind for {@code type}: text that is not a number, a number with a
      * fraction where a whole one belongs, anything but a string where text belongs, and so on.

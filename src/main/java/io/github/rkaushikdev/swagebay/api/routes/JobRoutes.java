@@ -171,7 +171,7 @@ public class JobRoutes {
                 Optional.empty());
     }
 
-    static JobOut jobOut(JobRow row) {
+    private static JobOut jobOut(JobRow row) {
         return new JobOut(
                 new JobNumber(row.getYear(), row.getSerial()).toString(),
                 row.getClient(),
@@ -183,7 +183,7 @@ public class JobRoutes {
                 row.getWelds().size());
     }
 
-    static WeldOut weldOut(WeldRow row) {
+    private static WeldOut weldOut(WeldRow row) {
         return new WeldOut(
                 new WeldId(row.getPrefix(), row.getNumber(), row.getRepairRound()).toString(),
                 row.getMaterialKey(),
@@ -196,7 +196,7 @@ public class JobRoutes {
                 row.getRadiographs().size());
     }
 
-    static RadiographOut radiographOut(RadiographRow row) {
+    private static RadiographOut radiographOut(RadiographRow row) {
         WeldRow weld = row.getWeld().orElseThrow();
         return new RadiographOut(
                 row.getNumber(),
