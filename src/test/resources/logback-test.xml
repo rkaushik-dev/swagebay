@@ -1,0 +1,13 @@
+<configuration>
+    <appender name="ERR" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.err</target>
+        <encoder>
+            <pattern>%-5level %logger{36} %msg%n</pattern>
+        </encoder>
+    </appender>
+    <!-- The persistence tests break constraints on purpose; the provider reports each one it sees. -->
+    <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="OFF"/>
+    <root level="WARN">
+        <appender-ref ref="ERR"/>
+    </root>
+</configuration>
