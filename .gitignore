@@ -1,21 +1,12 @@
-__pycache__/
-*.py[cod]
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-*.egg-info/
-build/
-dist/
-.venv/
-*.sqlite3
-qu_imager.sqlite3
-.hypothesis/
-# Java
+# Maven
 target/
+
+# H2 databases written by local runs
+*.mv.db
+*.trace.db
+
+# IDEs
 .idea/
 *.iml
 out/
-*.mv.db
-*.trace.db
+.vscode/
