@@ -1,6 +1,7 @@
 package io.github.rkaushikdev.swagebay.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.rkaushikdev.swagebay.Swagebay;
 import io.github.rkaushikdev.swagebay.api.routes.NonconformanceRoutes;
 import io.github.rkaushikdev.swagebay.persistence.Database;
 import io.github.rkaushikdev.swagebay.util.Times;
@@ -63,7 +64,7 @@ public class SwagebayApplication implements WebMvcConfigurer {
     public static final String SUMMARY = "radiographic technique planning and image quality qualification";
 
     /** The version the health route and the API document report. */
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = Swagebay.VERSION;
 
     private static final String DATABASE = "database";
 
