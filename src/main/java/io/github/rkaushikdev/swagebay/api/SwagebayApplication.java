@@ -1,6 +1,7 @@
 package io.github.rkaushikdev.swagebay.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.rkaushikdev.swagebay.api.routes.NonconformanceRoutes;
 import io.github.rkaushikdev.swagebay.persistence.Database;
 import io.github.rkaushikdev.swagebay.util.Times;
 import io.swagger.v3.core.jackson.ModelResolver;
@@ -67,7 +68,7 @@ public class SwagebayApplication implements WebMvcConfigurer {
     private static final String DATABASE = "database";
 
     /** Every router the service mounts. A new router is mounted by adding it here, and nowhere else. */
-    @Import({})
+    @Import({NonconformanceRoutes.class})
     static final class Routers {}
 
     /**
