@@ -86,5 +86,11 @@ final class Shell {
         List<String> lines() {
             return out.lines().toList();
         }
+
+        /** The code of the domain error the command failed with, off the one line it printed. */
+        String failure() {
+            int colon = err.indexOf(':');
+            return colon < 0 ? "" : err.substring(0, colon);
+        }
     }
 }

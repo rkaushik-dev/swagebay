@@ -40,7 +40,7 @@ import picocli.CommandLine.ParseResult;
         name = "swagebay",
         version = "swagebay, version " + Swagebay.VERSION,
         description = "Radiographic technique planning and image quality qualification.",
-        subcommands = {Main.Init.class})
+        subcommands = {CatalogueCommands.class, Main.Init.class, SafetyCommands.class})
 public final class Main extends Group {
 
     /** The command did what it was asked. */
