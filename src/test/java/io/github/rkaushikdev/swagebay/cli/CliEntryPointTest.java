@@ -21,6 +21,7 @@ import io.github.rkaushikdev.swagebay.TechniqueError;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.List;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine.Command;
@@ -106,6 +107,31 @@ class CliEntryPointTest {
     @Test
     void aCommandThatWorkedExitsZero() {
         assertThat(ending(command -> EXIT_OK).code()).isEqualTo(EXIT_OK);
+    }
+
+    /**
+     * Every group is reachable through the entry point: each answers {@code --help} with its own
+     * usage, where a name the entry point does not know gets no usage of its own.
+     */
+    @Test
+    void loadingTheCommandsRegistersEveryGroup() {
+        for (String name : List.of(
+                "job",
+                "weld",
+                "source",
+                "device",
+                "history",
+                "ncr",
+                "store",
+                "morning",
+                "report",
+                "register",
+                "technique")) {
+            Shell.Result result = new Shell().run(name, "--help");
+            assertThat(result.code()).as(name).isEqualTo(EXIT_OK);
+            assertThat(result.out()).as(name).contains("swagebay " + name);
+        }
+        assertThat(new Shell().run("gizmo", "--help").out()).doesNotContain("swagebay gizmo");
     }
 
     @Test

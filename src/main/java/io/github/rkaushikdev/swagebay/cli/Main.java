@@ -50,6 +50,7 @@ import picocli.CommandLine.ParseResult;
             MorningCommand.class,
             NonconformanceCommands.class,
             RegisterCommands.class,
+            ReportCommands.class,
             SafetyCommands.class,
             ShopCommands.class,
             SourceCommands.class,
