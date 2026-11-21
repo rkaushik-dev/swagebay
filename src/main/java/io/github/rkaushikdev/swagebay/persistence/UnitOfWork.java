@@ -17,7 +17,8 @@ import jakarta.persistence.EntityTransaction;
  *
  * <pre>{@code
  * try (UnitOfWork work = database.unitOfWork()) {
- *     work.entityManager().persist(job);
+ *     film.setNumber(work.numbering().takeRadiographNumber("24-0417"));
+ *     weld.addRadiograph(film);
  *     work.commit();
  * }
  * }</pre>
@@ -76,6 +77,15 @@ public final class UnitOfWork implements AutoCloseable {
      */
     public EntityManager entityManager() {
         return opened().entityManager();
+    }
+
+    /**
+     * The gapless counters, advanced inside this unit's transaction.
+     *
+     * @throws ConflictError when the unit is not open
+     */
+    public Numbering numbering() {
+        return opened().numbering();
     }
 
     /**
@@ -143,10 +153,10 @@ public final class UnitOfWork implements AutoCloseable {
      * built on it. Each repository takes the entity manager when the unit opens, so they all share
      * it and all go away together when it closes.
      */
-    private record Opened(EntityManager entityManager) {
+    private record Opened(EntityManager entityManager, Numbering numbering) {
 
         static Opened on(EntityManager entityManager) {
-            return new Opened(entityManager);
+            return new Opened(entityManager, new Numbering(entityManager));
         }
     }
 }
