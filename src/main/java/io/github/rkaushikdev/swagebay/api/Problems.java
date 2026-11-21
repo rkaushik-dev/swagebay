@@ -91,8 +91,8 @@ final class Problems {
     }
 
     /**
-     * Why Jackson could not read a body, located from where it stopped: a body that is not JSON at
-     * all, a value of the wrong kind, or a value whose shape refused to be built.
+     * Why a body that is JSON could not be read into its shape, located from where the reading
+     * stopped: a value of the wrong kind, or a value whose shape refused to be built.
      */
     static Problem unreadable(JsonMappingException mapping) {
         List<Object> loc = location(mapping);
@@ -103,8 +103,8 @@ final class Problems {
             return mismatch(loc, mismatched.getTargetType(), null, mismatched.getOriginalMessage());
         }
         Throwable cause = mapping.getCause() != null ? mapping.getCause() : mapping;
-        SwagebayError domain = cause instanceof SwagebayError error ? error : null;
-        return refusedBy(loc, null, Optional.ofNullable(domain), cause.getMessage());
+        Optional<SwagebayError> domain = cause instanceof SwagebayError error ? Optional.of(error) : Optional.empty();
+        return refusedBy(loc, null, domain, cause.getMessage());
     }
 
     /** A body that is not JSON, with where the reading stopped. */
