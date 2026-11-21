@@ -30,6 +30,12 @@ final class Dates {
     /** A moment with a space before the time. */
     static final String SPACED_MOMENT = "%Y-%m-%d %H:%M:%S";
 
+    /** What a help page shows for a day option. */
+    static final String DAY_LABEL = "[" + DAY + "]";
+
+    /** What a help page shows for a moment option, naming each format it reads. */
+    static final String MOMENT_LABEL = "[" + ISO_MOMENT + "|" + SPACED_MOMENT + "|" + DAY + "]";
+
     private static final String DATE = "(\\d\\d\\d\\d)-(1[0-2]|0[1-9]|[1-9])-(3[01]|[12]\\d|0[1-9]|[1-9]| [1-9])";
     private static final String TIME = "(2[0-3]|[0-1]\\d|\\d):([0-5]\\d|\\d):(6[0-1]|[0-5]\\d|\\d)";
     private static final int FLAGS = Pattern.UNICODE_CHARACTER_CLASS | Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
