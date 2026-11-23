@@ -12,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.rkaushikdev.swagebay.ConfigurationError;
 import io.github.rkaushikdev.swagebay.util.Decimals;
 import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CatalogueTest {
@@ -19,9 +20,9 @@ class CatalogueTest {
     private static final BigDecimal PLAIN = new BigDecimal("2.0");
 
     @Test
-    void theShopOwnsSixCurves() {
-        assertThat(allCharts()).hasSize(6);
-        assertThat(chartKeys()).hasSize(6);
+    void theShopOwnsSevenCurves() {
+        assertThat(allCharts()).hasSize(7);
+        assertThat(chartKeys()).hasSize(7);
         assertThat(chartKeys()).contains("ir192-steel-d7-2.0");
     }
 
@@ -108,7 +109,7 @@ class CatalogueTest {
     void filmSubstitutionReturnsTheChartsThatMatchEverythingElse() {
         assertThat(chartsForFilmSubstitution("ir192", "carbon_steel", PLAIN))
                 .extracting(ExposureChart::filmKey)
-                .containsExactlyInAnyOrder("d7", "d5");
+                .containsExactlyInAnyOrder("d7", "d5", "d4");
         assertThat(chartsForFilmSubstitution("co60", "carbon_steel", new BigDecimal("2.5")))
                 .isEmpty();
     }
@@ -117,5 +118,33 @@ class CatalogueTest {
     void aChartCanBeFetchedByKey() {
         assertThat(chart("se75-steel-d7-2.0").isotopeKey()).isEqualTo("se75");
         assertThatThrownBy(() -> chart("ir192-steel-d3-2.0")).isInstanceOf(ConfigurationError.class);
+    }
+
+    @Test
+    void theFineGrainCardSitsAtTheFilmSpeedRatioFromD7() {
+        ExposureChart fine = chartFor("ir192", "carbon_steel", "d4", PLAIN);
+        ExposureChart working = chartFor("ir192", "carbon_steel", "d7", PLAIN);
+        assertThat(fine.key()).isEqualTo("ir192-steel-d4-2.0");
+        assertThat(fine.referenceSfd()).isEqualTo(inch(24));
+        assertThat(fine.thinnest()).isEqualTo(inch("0.25"));
+        assertThat(fine.thickest()).isEqualTo(inch(2));
+        for (String thickness : List.of("0.50", "1.00", "1.50", "2.00")) {
+            BigDecimal ratio = Decimals.divide(fine.factorFor(inch(thickness)), working.factorFor(inch(thickness)));
+            assertThat(ratio).as(thickness).isBetween(new BigDecimal("3.0"), new BigDecimal("3.2"));
+        }
+    }
+
+    @Test
+    void everyCardReadsBackTheNumbersPrintedOnIt() {
+        ExposureChart working = chart("ir192-steel-d7-2.0");
+        assertThat(working.points()).hasSize(13);
+        assertThat(working.factorFor(inch("0.25"))).isEqualByComparingTo("4");
+        assertThat(working.factorFor(inch("2.50"))).isEqualByComparingTo("1050");
+        ExposureChart cobalt = chart("co60-steel-d7-2.0");
+        assertThat(cobalt.referenceSfd()).isEqualTo(inch(36));
+        assertThat(cobalt.density()).isEqualByComparingTo("2.0");
+        assertThat(cobalt.factorFor(inch(8))).isEqualByComparingTo("6000");
+        assertThat(chart("ir192-aluminium-d7-2.0").materialKey()).isEqualTo("aluminium");
+        assertThat(chart("se75-steel-d7-2.0").thinnest()).isEqualTo(inch("0.16"));
     }
 }

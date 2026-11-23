@@ -1,18 +1,20 @@
 package io.github.rkaushikdev.swagebay.exposure;
 
-import static java.util.Map.entry;
-
 import io.github.rkaushikdev.swagebay.ConfigurationError;
 import io.github.rkaushikdev.swagebay.Context;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 /**
  * The exposure charts this shop actually owns.
  *
- * <p>Six curves, established by shooting step wedges and re-established the last time the
+ * <p>Seven curves, established by shooting step wedges and re-established the last time the
  * processor chemistry changed, which is why the density each was drawn at is part of its identity.
+ * The D4 card is the newest, drawn for the fine grain work on thin wall where D7 is too coarse, and
+ * it sits at the speed ratio from D7 that the film data sheets say it should.
  *
  * <p>The resolver is deliberately narrow. Ask for an isotope, a material, a film and a density and
  * either a chart exists or it does not. There is no nearest match and no averaging of two curves,
@@ -24,106 +26,34 @@ import java.util.Optional;
 public final class Catalogue {
 
     private static final List<ExposureChart> CHARTS = List.of(
-            ExposureChart.fromInches(
-                    "ir192-steel-d7-2.0",
-                    "ir192",
-                    "carbon_steel",
-                    "d7",
-                    "2.0",
-                    "24",
-                    List.of(
-                            entry("0.25", "4"),
-                            entry("0.375", "5.6"),
-                            entry("0.50", "8"),
-                            entry("0.625", "11"),
-                            entry("0.75", "16"),
-                            entry("0.875", "22"),
-                            entry("1.00", "30"),
-                            entry("1.25", "55"),
-                            entry("1.50", "100"),
-                            entry("1.75", "180"),
-                            entry("2.00", "320"),
-                            entry("2.25", "580"),
-                            entry("2.50", "1050"))),
-            ExposureChart.fromInches(
-                    "ir192-steel-d5-2.0",
-                    "ir192",
-                    "carbon_steel",
-                    "d5",
-                    "2.0",
-                    "24",
-                    List.of(
-                            entry("0.25", "7.3"),
-                            entry("0.50", "14.5"),
-                            entry("0.75", "29"),
-                            entry("1.00", "55"),
-                            entry("1.25", "100"),
-                            entry("1.50", "182"),
-                            entry("1.75", "327"),
-                            entry("2.00", "582"))),
-            ExposureChart.fromInches(
-                    "ir192-steel-d7-2.5",
-                    "ir192",
-                    "carbon_steel",
-                    "d7",
-                    "2.5",
-                    "24",
-                    List.of(
-                            entry("0.25", "5.4"),
-                            entry("0.50", "10.8"),
-                            entry("0.75", "21.6"),
-                            entry("1.00", "40.5"),
-                            entry("1.25", "74"),
-                            entry("1.50", "135"),
-                            entry("1.75", "243"),
-                            entry("2.00", "432"))),
-            ExposureChart.fromInches(
-                    "se75-steel-d7-2.0",
-                    "se75",
-                    "carbon_steel",
-                    "d7",
-                    "2.0",
-                    "24",
-                    List.of(
-                            entry("0.16", "6"),
-                            entry("0.25", "11"),
-                            entry("0.375", "22"),
-                            entry("0.50", "44"),
-                            entry("0.625", "88"),
-                            entry("0.75", "175"),
-                            entry("0.875", "350"),
-                            entry("1.00", "700"))),
-            ExposureChart.fromInches(
-                    "co60-steel-d7-2.0",
-                    "co60",
-                    "carbon_steel",
-                    "d7",
-                    "2.0",
-                    "36",
-                    List.of(
-                            entry("2.00", "60"),
-                            entry("2.50", "88"),
-                            entry("3.00", "130"),
-                            entry("3.50", "190"),
-                            entry("4.00", "280"),
-                            entry("5.00", "600"),
-                            entry("6.00", "1300"),
-                            entry("7.00", "2800"),
-                            entry("8.00", "6000"))),
-            ExposureChart.fromInches(
-                    "ir192-aluminium-d7-2.0",
-                    "ir192",
-                    "aluminium",
-                    "d7",
-                    "2.0",
-                    "24",
-                    List.of(
-                            entry("0.50", "3.2"),
-                            entry("1.00", "5.4"),
-                            entry("1.50", "9.1"),
-                            entry("2.00", "15.4"),
-                            entry("3.00", "44"),
-                            entry("4.00", "125"))));
+            card(
+                    "ir192-steel-d7-2.0 ir192 carbon_steel d7 2.0 24",
+                    "0.25  0.375  0.50  0.625  0.75  0.875  1.00  1.25  1.50  1.75  2.00  2.25  2.50",
+                    "4     5.6    8     11     16    22     30    55    100   180   320   580   1050"),
+            card(
+                    "ir192-steel-d5-2.0 ir192 carbon_steel d5 2.0 24",
+                    "0.25  0.50  0.75  1.00  1.25  1.50  1.75  2.00",
+                    "7.3   14.5  29    55    100   182   327   582"),
+            card(
+                    "ir192-steel-d4-2.0 ir192 carbon_steel d4 2.0 24",
+                    "0.25  0.50  0.75  1.00  1.25  1.50  1.75  2.00",
+                    "12.5  25    50    94    172   312   562   1000"),
+            card(
+                    "ir192-steel-d7-2.5 ir192 carbon_steel d7 2.5 24",
+                    "0.25  0.50  0.75  1.00  1.25  1.50  1.75  2.00",
+                    "5.4   10.8  21.6  40.5  74    135   243   432"),
+            card(
+                    "se75-steel-d7-2.0 se75 carbon_steel d7 2.0 24",
+                    "0.16  0.25  0.375  0.50  0.625  0.75  0.875  1.00",
+                    "6     11    22     44    88     175   350    700"),
+            card(
+                    "co60-steel-d7-2.0 co60 carbon_steel d7 2.0 36",
+                    "2.00  2.50  3.00  3.50  4.00  5.00  6.00  7.00  8.00",
+                    "60    88    130   190   280   600   1300  2800  6000"),
+            card(
+                    "ir192-aluminium-d7-2.0 ir192 aluminium d7 2.0 24",
+                    "0.50  1.00  1.50  2.00  3.00  4.00",
+                    "3.2   5.4   9.1   15.4  44    125"));
 
     private Catalogue() {}
 
@@ -185,5 +115,25 @@ public final class Catalogue {
                 .filter(candidate -> candidate.materialKey().equals(materialKey))
                 .filter(candidate -> candidate.density().compareTo(density) == 0)
                 .toList();
+    }
+
+    /**
+     * A chart the way the card on the wall is printed: a heading with the key, the isotope, the
+     * material, the film, the density and the distance in inches, then the thicknesses in inches
+     * across one row and the curie minutes under each of them in the next.
+     *
+     * @throws ConfigurationError for a heading that is not six fields, or rows of different lengths
+     */
+    private static ExposureChart card(String heading, String thicknessesInches, String curieMinutes) {
+        String[] fields = heading.trim().split("\\s+");
+        String[] thicknesses = thicknessesInches.trim().split("\\s+");
+        String[] readings = curieMinutes.trim().split("\\s+");
+        if (fields.length != 6 || thicknesses.length != readings.length) {
+            throw new ConfigurationError("an exposure card is not laid out right", Context.of("heading", heading));
+        }
+        List<Map.Entry<String, String>> points = IntStream.range(0, thicknesses.length)
+                .mapToObj(i -> Map.entry(thicknesses[i], readings[i]))
+                .toList();
+        return ExposureChart.fromInches(fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], points);
     }
 }
