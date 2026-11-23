@@ -96,7 +96,7 @@ class IsotopeTest {
 
     @Test
     void theCatalogueIsClosedAndSorted() {
-        assertThat(Isotopes.knownIsotopes()).containsExactly("co60", "cs137", "ir192", "se75", "yb169");
+        assertThat(Isotopes.knownIsotopes()).containsExactly("co60", "cs137", "ir192", "se75", "tm170", "yb169");
         assertThatThrownBy(() -> isotope("ra226")).isInstanceOf(ConfigurationError.class);
     }
 
@@ -105,5 +105,35 @@ class IsotopeTest {
         assertThat(IR192).hasToString("Ir-192");
         assertThat(CO60).hasToString("Co-60");
         assertThat(IR192.name()).isEqualTo("iridium 192");
+    }
+
+    @Test
+    void thuliumIsTheSoftestAndTheWeakestOfTheLot() {
+        Isotope thulium = isotope("tm170");
+        assertThat(thulium.symbol()).isEqualTo("Tm-170");
+        assertThat(thulium).hasToString("Tm-170");
+        assertThat(thulium.halfLifeDays()).isEqualByComparingTo("128.6");
+        assertThat(thulium.gammaConstant()).isLessThan(isotope("yb169").gammaConstant());
+        assertThat(thulium.energyKevHigh()).isEqualTo(84);
+        assertThat(thulium.isBroadSpectrum()).isFalse();
+        assertThat(thulium.equivalenceQuality()).isEmpty();
+        assertThat(thulium.covers(mm(2))).isTrue();
+        assertThat(thulium.covers(mm(13))).isFalse();
+    }
+
+    @Test
+    void thinWallListsThuliumFirstBecauseItIsSoftest() {
+        assertThat(isotopesCovering(mm(5))).extracting(Isotope::key).containsExactly("tm170", "yb169", "se75");
+        assertThat(isotopesCovering(mm(14))).extracting(Isotope::key).containsExactly("yb169", "se75", "ir192");
+    }
+
+    @Test
+    void everyRowReadsBackItsNumbers() {
+        assertThat(isotope("ir192").equivalenceQuality()).contains(Quality.IR192);
+        assertThat(isotope("co60").equivalenceQuality()).contains(Quality.CO60);
+        assertThat(isotope("se75").steelMin()).isEqualTo(mm(4));
+        assertThat(isotope("cs137").steelMax()).isEqualTo(mm(100));
+        assertThat(isotope("co60").energyKevLow()).isEqualTo(1173);
+        assertThat(isotope("yb169").name()).isEqualTo("ytterbium 169");
     }
 }

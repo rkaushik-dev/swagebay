@@ -17,18 +17,21 @@ import java.util.Optional;
  * <p>Iridium is the workhorse and it covers most of what a pipeline crew meets. Selenium is softer
  * and is what gets used on thin wall where iridium washes the contrast out. Cobalt is for heavy
  * vessel wall and it needs a shielded area nobody has on a construction site. Ytterbium is for very
- * thin wall and small bore and hardly anybody owns one.
+ * thin wall and small bore and hardly anybody owns one. Thulium is softer still and so weak that a
+ * crew can work it with a short rope, which is the reason anybody puts up with exposure times that
+ * long.
  */
 public final class Isotopes {
 
     private static final Map<String, Isotope> ISOTOPES = new LinkedHashMap<>();
 
     static {
-        add("ir192", "iridium 192", "Ir-192", "73.83", "0.48", 206, 612, 12, 63, Quality.IR192);
-        add("se75", "selenium 75", "Se-75", "119.78", "0.203", 66, 401, 4, 28, null);
-        add("co60", "cobalt 60", "Co-60", "1925.3", "1.32", 1173, 1333, 50, 200, Quality.CO60);
-        add("yb169", "ytterbium 169", "Yb-169", "32.0", "0.125", 63, 308, 1, 15, null);
-        add("cs137", "caesium 137", "Cs-137", "11012.0", "0.33", 662, 662, 25, 100, null);
+        row("ir192", "iridium 192", "Ir-192  73.83    0.48    206   612   12  63   IR192");
+        row("se75", "selenium 75", "Se-75   119.78   0.203   66    401   4   28   -");
+        row("co60", "cobalt 60", "Co-60   1925.3   1.32    1173  1333  50  200  CO60");
+        row("yb169", "ytterbium 169", "Yb-169  32.0     0.125   63    308   1   15   -");
+        row("cs137", "caesium 137", "Cs-137  11012.0  0.33    662   662   25  100  -");
+        row("tm170", "thulium 170", "Tm-170  128.6    0.0025  52    84    2   12   -");
     }
 
     /** Iridium 192, the workhorse. */
@@ -48,11 +51,8 @@ public final class Isotopes {
      * @throws ConfigurationError for an isotope the shop does not hold
      */
     public static Isotope isotope(String key) {
-        Isotope found = ISOTOPES.get(key);
-        if (found == null) {
-            throw new ConfigurationError("no such isotope", Context.of("key", key));
-        }
-        return found;
+        return Optional.ofNullable(ISOTOPES.get(key))
+                .orElseThrow(() -> new ConfigurationError("no such isotope", Context.of("key", key)));
     }
 
     /** Every isotope key, sorted. */
@@ -68,29 +68,28 @@ public final class Isotopes {
                 .toList();
     }
 
-    private static void add(
-            String key,
-            String name,
-            String symbol,
-            String halfLifeDays,
-            String gammaConstant,
-            int energyLow,
-            int energyHigh,
-            long steelMinMm,
-            long steelMaxMm,
-            Quality quality) {
+    /**
+     * One row of the source data: the symbol, the half life in days, roentgen an hour at a metre
+     * from a curie, the lowest and highest line in keV, the steel range in millimetres, then the E94
+     * column or a dash where the standard publishes none.
+     */
+    private static void row(String key, String name, String cells) {
+        String[] cell = cells.trim().split("\\s+");
+        if (cell.length != 8) {
+            throw new ConfigurationError("an isotope row has the wrong number of columns", Context.of("key", key));
+        }
         ISOTOPES.put(
                 key,
                 new Isotope(
                         key,
                         name,
-                        symbol,
-                        new BigDecimal(halfLifeDays),
-                        new BigDecimal(gammaConstant),
-                        energyLow,
-                        energyHigh,
-                        Length.fromMm(steelMinMm),
-                        Length.fromMm(steelMaxMm),
-                        Optional.ofNullable(quality)));
+                        cell[0],
+                        new BigDecimal(cell[1]),
+                        new BigDecimal(cell[2]),
+                        Integer.parseInt(cell[3]),
+                        Integer.parseInt(cell[4]),
+                        Length.fromMm(cell[5]),
+                        Length.fromMm(cell[6]),
+                        cell[7].equals("-") ? Optional.empty() : Optional.of(Quality.valueOf(cell[7]))));
     }
 }

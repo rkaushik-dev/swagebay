@@ -14,6 +14,7 @@ import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.quantities.Activity;
 import io.github.rkaushikdev.swagebay.quantities.DoseRate;
 import io.github.rkaushikdev.swagebay.sources.Isotope;
+import io.github.rkaushikdev.swagebay.sources.Isotopes;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -179,5 +180,39 @@ class TransportTest {
         assertThatThrownBy(() -> reading("   ", "1800", "18")).isInstanceOf(ValidationError.class);
         assertThat(PackageType.TYPE_B).hasToString("Type B package");
         assertThat(Label.YELLOW_III).hasToString("Yellow-III");
+    }
+
+    @Test
+    void theA2LimitsAreThePublishedOnes() {
+        assertThat(Transport.a2Limit(IR192)).isEqualTo(Activity.fromTbq("0.6"));
+        assertThat(Transport.a2Limit(CO60)).isEqualTo(Activity.fromTbq("0.4"));
+        assertThat(Transport.a2Limit(SE75)).isEqualTo(Activity.fromTbq(3));
+        assertThat(Transport.typeALimit(IR192, true)).isEqualTo(Transport.a1Limit(IR192));
+        assertThat(Transport.typeALimit(IR192, false)).isEqualTo(Transport.a2Limit(IR192));
+    }
+
+    @Test
+    void aLapsedSpecialFormCertificateHoldsTheSourceToA2() {
+        TransportPackage current = aPackage("880D-221", IR192, curie(20), PackageType.TYPE_A, "40", "4");
+        TransportPackage lapsed = new TransportPackage(
+                current.reference(),
+                IR192,
+                curie(20),
+                PackageType.TYPE_A,
+                current.surfaceRate(),
+                current.rateAtOneMetre(),
+                false);
+        assertThat(current.specialForm()).isTrue();
+        assertThat(current.faults()).isEmpty();
+        assertThat(curie(20)).isGreaterThan(Transport.a2Limit(IR192));
+        assertThat(lapsed.faults()).singleElement().satisfies(fault -> assertThat(fault)
+                .endsWith("A2 limit for a Type A package without special form"));
+    }
+
+    @Test
+    void thuliumHasItsOwnLimits() {
+        Isotope thulium = Isotopes.isotope("tm170");
+        assertThat(Transport.a1Limit(thulium)).isEqualTo(Activity.fromTbq(3));
+        assertThat(Transport.a2Limit(thulium)).isEqualTo(Activity.fromTbq("0.8"));
     }
 }

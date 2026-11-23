@@ -20,6 +20,7 @@ import java.util.Objects;
  * @param packageType the kind of package
  * @param surfaceRate the rate measured at the surface of the package
  * @param rateAtOneMetre the rate measured a metre from it
+ * @param specialForm whether the source's special form certificate is current
  */
 public record TransportPackage(
         String reference,
@@ -27,7 +28,8 @@ public record TransportPackage(
         Activity activity,
         PackageType packageType,
         DoseRate surfaceRate,
-        DoseRate rateAtOneMetre) {
+        DoseRate rateAtOneMetre,
+        boolean specialForm) {
 
     /**
      * A package.
@@ -43,6 +45,17 @@ public record TransportPackage(
         if (Text.strip(reference).isEmpty()) {
             throw new ValidationError("a package has a reference");
         }
+    }
+
+    /** A package of a source whose special form certificate is current. */
+    public TransportPackage(
+            String reference,
+            Isotope isotope,
+            Activity activity,
+            PackageType packageType,
+            DoseRate surfaceRate,
+            DoseRate rateAtOneMetre) {
+        this(reference, isotope, activity, packageType, surfaceRate, rateAtOneMetre, true);
     }
 
     /** The transport index from the reading at a metre. */
@@ -61,7 +74,8 @@ public record TransportPackage(
 
     /**
      * Everything wrong with the package before it leaves the yard: contents over the A1 limit for a
-     * Type A package, a source travelling as an excepted package, and a package no label covers.
+     * Type A package, or over the A2 limit when the special form certificate has lapsed, a source
+     * travelling as an excepted package, and a package no label covers.
      *
      * @throws io.github.rkaushikdev.swagebay.ConfigurationError for a Type A package of an isotope with
      *     no published limit
@@ -69,10 +83,12 @@ public record TransportPackage(
     public List<String> faults() {
         List<String> out = new ArrayList<>();
         if (packageType == PackageType.TYPE_A) {
-            Activity limit = Transport.a1Limit(isotope);
+            Activity limit = Transport.typeALimit(isotope, specialForm);
             if (activity.compareTo(limit) > 0) {
                 out.add(activity.formatCurie() + " is over the " + limit.formatTbq()
-                        + " A1 limit for a Type A package");
+                        + (specialForm
+                                ? " A1 limit for a Type A package"
+                                : " A2 limit for a Type A package without special form"));
             }
         }
         if (packageType == PackageType.EXCEPTED) {
