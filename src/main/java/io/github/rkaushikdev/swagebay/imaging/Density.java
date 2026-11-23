@@ -32,18 +32,18 @@ public final class Density {
 
     /** Grade single film readings with no calibration on record, which is itself a reason. */
     public static DensityVerdict grade(List<Reading> readings, boolean gamma) {
-        return grade(readings, gamma, false, Optional.empty(), Optional.empty());
+        return grade(readings, DensityLimits.sectionV(gamma, false), Optional.empty(), Optional.empty());
     }
 
     /** Grade readings, single film or composite, with no calibration on record. */
     public static DensityVerdict grade(List<Reading> readings, boolean gamma, boolean composite) {
-        return grade(readings, gamma, composite, Optional.empty(), Optional.empty());
+        return grade(readings, DensityLimits.sectionV(gamma, composite), Optional.empty(), Optional.empty());
     }
 
     /** Grade single film readings taken at a moment on an instrument with that calibration. */
     public static DensityVerdict grade(
             List<Reading> readings, boolean gamma, Calibration calibration, LocalDateTime readAt) {
-        return grade(readings, gamma, false, Optional.of(calibration), Optional.of(readAt));
+        return grade(readings, DensityLimits.sectionV(gamma, false), Optional.of(calibration), Optional.of(readAt));
     }
 
     /**
@@ -67,6 +67,24 @@ public final class Density {
             boolean composite,
             Optional<Calibration> calibration,
             Optional<LocalDateTime> readAt) {
+        return grade(readings, DensityLimits.sectionV(gamma, composite), calibration, readAt);
+    }
+
+    /**
+     * Hold the readings to the limits of whichever standard the job is worked to, with the
+     * densitometer's check graded the same way under every one of them.
+     *
+     * <p>The variation rule, and with it the one reading through the indicator it needs, applies only
+     * where the limits say so. Under ISO every reading is simply held between the floor and the
+     * ceiling and the window is left unset.
+     *
+     * @throws ValidationError when there are no readings
+     */
+    public static DensityVerdict grade(
+            List<Reading> readings,
+            DensityLimits limits,
+            Optional<Calibration> calibration,
+            Optional<LocalDateTime> readAt) {
         if (readings.isEmpty()) {
             throw new ValidationError("there is nothing to grade");
         }
@@ -76,17 +94,17 @@ public final class Density {
         } else if (readAt.isPresent() && !calibration.get().isCurrentAt(readAt.get())) {
             reasons.add("densitometer calibration is not current");
         }
-
-        BigDecimal floor = Films.densityFloor(gamma, composite);
         for (Reading reading : readings) {
-            if (reading.density().compareTo(floor) < 0) {
-                reasons.add(reading.label() + " reads " + reading.density() + " below the floor of " + floor);
-            } else if (reading.density().compareTo(Films.DENSITY_CEILING) > 0) {
-                reasons.add(reading.label() + " reads " + reading.density() + " above the ceiling of "
-                        + Films.DENSITY_CEILING);
+            if (reading.density().compareTo(limits.floor()) < 0) {
+                reasons.add(reading.label() + " reads " + reading.density() + " below the floor of " + limits.floor());
+            } else if (reading.density().compareTo(limits.ceiling()) > 0) {
+                reasons.add(
+                        reading.label() + " reads " + reading.density() + " above the ceiling of " + limits.ceiling());
             }
         }
-
+        if (!limits.variationRule()) {
+            return new DensityVerdict(reasons.isEmpty(), reasons, Optional.empty(), Optional.empty(), Optional.empty());
+        }
         List<Reading> through =
                 readings.stream().filter(Reading::throughIndicator).toList();
         if (through.size() != 1) {
