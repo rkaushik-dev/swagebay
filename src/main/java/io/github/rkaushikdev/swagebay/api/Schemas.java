@@ -256,7 +256,11 @@ public final class Schemas {
             Optional<String> shot,
             String indicatorSide,
             Optional<@Positive Integer> windowMinutes,
-            @Positive BigDecimal density) {
+            @Positive BigDecimal density,
+            String distanceRule) {
+
+        /** The rule the distance is set by when none is given. */
+        public static final String DISTANCE_RULE = "ASME Section V";
 
         /** The indicator side when none is given. */
         public static final String INDICATOR_SIDE = "source side";
@@ -269,6 +273,7 @@ public final class Schemas {
             indicatorSide = orDefault(indicatorSide, INDICATOR_SIDE);
             windowMinutes = orNone(windowMinutes);
             density = orDefault(density, DENSITY);
+            distanceRule = orDefault(distanceRule, DISTANCE_RULE);
         }
     }
 

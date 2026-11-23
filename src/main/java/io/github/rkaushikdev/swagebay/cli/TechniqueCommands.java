@@ -1,7 +1,5 @@
 package io.github.rkaushikdev.swagebay.cli;
 
-import io.github.rkaushikdev.swagebay.Context;
-import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.identity.JobNumber;
 import io.github.rkaushikdev.swagebay.identity.WeldId;
 import io.github.rkaushikdev.swagebay.imaging.IndicatorSide;
@@ -10,14 +8,11 @@ import io.github.rkaushikdev.swagebay.quantities.Duration;
 import io.github.rkaushikdev.swagebay.services.PlanRequest;
 import io.github.rkaushikdev.swagebay.services.PlanningService;
 import io.github.rkaushikdev.swagebay.technique.TechniqueSheet;
-import io.github.rkaushikdev.swagebay.util.Text;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
@@ -72,6 +67,13 @@ final class TechniqueCommands extends Group {
         @Option(names = "--window", paramLabel = "INTEGER", description = "clear time in minutes")
         private Optional<Integer> window;
 
+        @Option(
+                names = "--distance-rule",
+                paramLabel = "TEXT",
+                defaultValue = "ASME Section V",
+                description = "what sets the source distance: ASME Section V, or ISO 17636-1 class A or B")
+        private String distanceRule;
+
         @Override
         public Integer call() {
             PlanRequest request = PlanRequest.builder(WeldId.parse(weld), serial, film, at)
@@ -79,6 +81,7 @@ final class TechniqueCommands extends Group {
                     .indicatorSide(filmSide ? IndicatorSide.FILM : IndicatorSide.SOURCE)
                     .window(window.map(minutes -> Duration.fromMinutes(minutes)))
                     .density(SHEET_DENSITY)
+                    .distanceRule(Naming.distanceRuleNamed(distanceRule))
                     .build();
             TechniqueSheet sheet = fromWork(work -> PlanningService.plan(work, JobNumber.parse(number), request));
             out().println(Render.heading("technique sheet " + weld));
@@ -128,13 +131,7 @@ final class TechniqueCommands extends Group {
 
         @Override
         public Integer call() {
-            List<String> keys = Arrays.stream(films.split(Pattern.quote(","), -1))
-                    .map(Text::strip)
-                    .filter(key -> !key.isEmpty())
-                    .toList();
-            if (keys.isEmpty()) {
-                throw new ValidationError("name at least one film to compare", Context.of("films", films));
-            }
+            List<String> keys = PlanningService.filmKeys(films);
             PlanRequest request = PlanRequest.builder(WeldId.parse(weld), serial, keys.getFirst(), at)
                     .shot(Naming.optionalShotNamed(shot))
                     .build();

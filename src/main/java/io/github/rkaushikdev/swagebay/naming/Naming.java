@@ -4,6 +4,7 @@ import io.github.rkaushikdev.swagebay.Context;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.evaluation.Code;
 import io.github.rkaushikdev.swagebay.evaluation.Kind;
+import io.github.rkaushikdev.swagebay.geometry.DistanceRule;
 import io.github.rkaushikdev.swagebay.geometry.ShotType;
 import io.github.rkaushikdev.swagebay.imaging.IndicatorSide;
 import io.github.rkaushikdev.swagebay.imaging.TechniqueClass;
@@ -86,6 +87,11 @@ public final class Naming {
     /** A shot type when one is given; nothing means let the planner pick, which is a real answer. */
     public static Optional<ShotType> optionalShotNamed(Optional<String> value) {
         return value.map(Naming::shotNamed);
+    }
+
+    /** A distance rule: {@code ISO 17636-1 class B} or {@code iso_17636_class_b}. */
+    public static DistanceRule distanceRuleNamed(String value) {
+        return named(DistanceRule.class, value, "distance rule");
     }
 
     /** An indicator side: {@code film side} or {@code film}. */

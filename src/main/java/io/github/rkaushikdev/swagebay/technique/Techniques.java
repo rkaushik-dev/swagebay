@@ -114,7 +114,7 @@ public final class Techniques {
         ShotType shot = request.shot().orElseGet(() -> Shots.chooseShot(joint, focal, GUIDE_CLEARANCE));
         Length penetrated = Shots.penetratedThickness(joint, shot);
 
-        BeamGeometry geometry = geometryFor(joint, shot, focal);
+        BeamGeometry geometry = geometryFor(joint, shot, focal, request.distanceRule());
         Length sfd = geometry.sourceToFilm();
 
         HoleSelection indicator = Selection.holeSelection(penetrated, request.indicatorSide());
@@ -184,10 +184,8 @@ public final class Techniques {
         for (String reason : request.source().reasonsNotToUse(request.shotAt())) {
             out.add("source is not fit: " + reason);
         }
-        if (!geometry.meets(request.joint().wall())) {
-            out.add("geometric unsharpness " + geometry.geometricUnsharpness().formatMm(3) + " is over "
-                    + BeamGeometry.unsharpnessLimit(request.joint().wall()).formatMm(3));
-        }
+        out.addAll(
+                distanceFaults(request.distanceRule(), geometry, request.joint().wall()));
         if (!request.source().isotope().covers(penetrated)) {
             out.add(request.source().isotope() + " is outside its practical range at " + penetrated.formatMm());
         }
@@ -196,6 +194,25 @@ public final class Techniques {
                     + request.window().get().asTimer());
         }
         return out;
+    }
+
+    /**
+     * What is wrong with the geometry under the rule the procedure names: the unsharpness over the
+     * limit under Section V, the source closer than the minimum under ISO 17636-1. An inside shot
+     * cannot be stood off further, so it is the one that ends up here.
+     */
+    static List<String> distanceFaults(DistanceRule rule, BeamGeometry geometry, Length wall) {
+        if (geometry.meets(rule, wall)) {
+            return List.of();
+        }
+        if (rule.isIso()) {
+            Length minimum = rule.minimumSourceToObject(geometry.focalSize(), geometry.objectToFilm(), wall);
+            return List.of("source to object " + geometry.sourceToObject().formatMm(0) + " is under the "
+                    + minimum.formatMm(0) + " " + rule + " asks for");
+        }
+        return List.of(
+                "geometric unsharpness " + geometry.geometricUnsharpness().formatMm(3) + " is over "
+                        + BeamGeometry.unsharpnessLimit(wall).formatMm(3));
     }
 
     /** Lead screens shorten the shot, and the pair depends on the beam. */

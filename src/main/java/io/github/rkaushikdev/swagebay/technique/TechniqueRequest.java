@@ -1,5 +1,6 @@
 package io.github.rkaushikdev.swagebay.technique;
 
+import io.github.rkaushikdev.swagebay.geometry.DistanceRule;
 import io.github.rkaushikdev.swagebay.geometry.Joint;
 import io.github.rkaushikdev.swagebay.geometry.ShotType;
 import io.github.rkaushikdev.swagebay.imaging.FilmSystem;
@@ -30,6 +31,7 @@ import java.util.Optional;
  * @param indicatorSide which side of the weld the indicator goes on
  * @param window the clear time the client gives, when there is a limit
  * @param density the density the film is exposed to, which picks the chart
+ * @param distanceRule the rule the procedure sets the source distance by
  */
 public record TechniqueRequest(
         Joint joint,
@@ -42,7 +44,8 @@ public record TechniqueRequest(
         Optional<String> collimatorKey,
         IndicatorSide indicatorSide,
         Optional<Duration> window,
-        BigDecimal density) {
+        BigDecimal density,
+        DistanceRule distanceRule) {
 
     /** The density a shop exposes to unless told otherwise. */
     public static final BigDecimal DEFAULT_DENSITY = new BigDecimal("2.0");
@@ -59,11 +62,13 @@ public record TechniqueRequest(
         Objects.requireNonNull(indicatorSide, "indicatorSide");
         Objects.requireNonNull(window, "window");
         Objects.requireNonNull(density, "density");
+        Objects.requireNonNull(distanceRule, "distanceRule");
     }
 
     /**
      * A builder holding what every request has. The planner chooses the shot, screens are fitted,
-     * no collimator, the indicator on the source side, no window and a density of 2.0.
+     * no collimator, the indicator on the source side, no window, a density of 2.0 and the source
+     * distance set by the Section V unsharpness limit.
      */
     public static Builder builder(
             Joint joint, SealedSource source, ImagingSystem system, FilmSystem film, LocalDateTime shotAt) {
@@ -84,6 +89,7 @@ public record TechniqueRequest(
         private IndicatorSide indicatorSide = IndicatorSide.SOURCE;
         private Optional<Duration> window = Optional.empty();
         private BigDecimal density = DEFAULT_DENSITY;
+        private DistanceRule distanceRule = DistanceRule.ASME_V;
 
         private Builder(Joint joint, SealedSource source, ImagingSystem system, FilmSystem film, LocalDateTime shotAt) {
             this.joint = joint;
@@ -174,6 +180,12 @@ public record TechniqueRequest(
             return this;
         }
 
+        /** The rule the procedure sets the source distance by. */
+        public Builder distanceRule(DistanceRule value) {
+            distanceRule = value;
+            return this;
+        }
+
         /** The request as assembled. */
         public TechniqueRequest build() {
             return new TechniqueRequest(
@@ -187,7 +199,8 @@ public record TechniqueRequest(
                     collimatorKey,
                     indicatorSide,
                     window,
-                    density);
+                    density,
+                    distanceRule);
         }
     }
 }

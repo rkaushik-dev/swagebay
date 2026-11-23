@@ -1,6 +1,7 @@
 package io.github.rkaushikdev.swagebay.services;
 
 import io.github.rkaushikdev.swagebay.ValidationError;
+import io.github.rkaushikdev.swagebay.geometry.DistanceRule;
 import io.github.rkaushikdev.swagebay.geometry.ShotType;
 import io.github.rkaushikdev.swagebay.identity.WeldId;
 import io.github.rkaushikdev.swagebay.imaging.IndicatorSide;
@@ -24,6 +25,7 @@ import java.util.Optional;
  * @param indicatorSide which side of the weld the indicator goes on
  * @param window the clear time the client gives, when there is a limit
  * @param density the density the film is exposed to
+ * @param distanceRule the rule the procedure sets the source distance by
  */
 public record PlanRequest(
         WeldId weld,
@@ -33,7 +35,8 @@ public record PlanRequest(
         Optional<ShotType> shot,
         IndicatorSide indicatorSide,
         Optional<Duration> window,
-        BigDecimal density) {
+        BigDecimal density,
+        DistanceRule distanceRule) {
 
     /**
      * A request.
@@ -47,6 +50,7 @@ public record PlanRequest(
         Objects.requireNonNull(indicatorSide, "indicatorSide");
         Objects.requireNonNull(window, "window");
         Objects.requireNonNull(density, "density");
+        Objects.requireNonNull(distanceRule, "distanceRule");
         if (Text.isBlank(sourceSerial)) {
             throw new ValidationError("a plan names the source it is planned for");
         }
@@ -57,8 +61,8 @@ public record PlanRequest(
 
     /**
      * A builder holding the four things every plan names. The planner chooses the shot, the
-     * indicator goes on the source side, there is no window and the density is {@link
-     * TechniqueRequest#DEFAULT_DENSITY}.
+     * indicator goes on the source side, there is no window, the density is {@link
+     * TechniqueRequest#DEFAULT_DENSITY} and the distance is set by Section V.
      */
     public static Builder builder(WeldId weld, String sourceSerial, String filmKey, LocalDateTime shotAt) {
         return new Builder(weld, sourceSerial, filmKey, shotAt);
@@ -66,7 +70,8 @@ public record PlanRequest(
 
     /** The same plan on a different film, for comparing. */
     public PlanRequest onFilm(String otherFilmKey) {
-        return new PlanRequest(weld, sourceSerial, otherFilmKey, shotAt, shot, indicatorSide, window, density);
+        return new PlanRequest(
+                weld, sourceSerial, otherFilmKey, shotAt, shot, indicatorSide, window, density, distanceRule);
     }
 
     /** Assembles a {@link PlanRequest} from the defaults a shop plans to. */
@@ -80,6 +85,7 @@ public record PlanRequest(
         private IndicatorSide indicatorSide = IndicatorSide.SOURCE;
         private Optional<Duration> window = Optional.empty();
         private BigDecimal density = TechniqueRequest.DEFAULT_DENSITY;
+        private DistanceRule distanceRule = DistanceRule.ASME_V;
 
         private Builder(WeldId weld, String sourceSerial, String filmKey, LocalDateTime shotAt) {
             this.weld = weld;
@@ -146,13 +152,20 @@ public record PlanRequest(
             return this;
         }
 
+        /** The rule the procedure sets the source distance by. */
+        public Builder distanceRule(DistanceRule value) {
+            distanceRule = value;
+            return this;
+        }
+
         /**
          * The request as assembled.
          *
          * @throws ValidationError when it names no source or no film
          */
         public PlanRequest build() {
-            return new PlanRequest(weld, sourceSerial, filmKey, shotAt, shot, indicatorSide, window, density);
+            return new PlanRequest(
+                    weld, sourceSerial, filmKey, shotAt, shot, indicatorSide, window, density, distanceRule);
         }
     }
 }

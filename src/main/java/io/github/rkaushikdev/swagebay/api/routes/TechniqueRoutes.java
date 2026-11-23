@@ -1,6 +1,5 @@
 package io.github.rkaushikdev.swagebay.api.routes;
 
-import io.github.rkaushikdev.swagebay.Context;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.api.Schemas.ActivityOut;
 import io.github.rkaushikdev.swagebay.api.Schemas.CoverageOut;
@@ -16,10 +15,8 @@ import io.github.rkaushikdev.swagebay.quantities.Duration;
 import io.github.rkaushikdev.swagebay.services.PlanRequest;
 import io.github.rkaushikdev.swagebay.services.PlanningService;
 import io.github.rkaushikdev.swagebay.technique.TechniqueSheet;
-import io.github.rkaushikdev.swagebay.util.Text;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,14 +107,7 @@ public class TechniqueRoutes {
      * @throws ValidationError when that leaves none
      */
     private static List<String> films(String films) {
-        List<String> keys = Arrays.stream(films.split(",", -1))
-                .map(Text::strip)
-                .filter(key -> !key.isEmpty())
-                .toList();
-        if (keys.isEmpty()) {
-            throw new ValidationError("name at least one film to compare", Context.of("films", films));
-        }
-        return keys;
+        return PlanningService.filmKeys(films);
     }
 
     private static PlanRequest request(WeldId weld, PlanIn body) {
@@ -129,7 +119,8 @@ public class TechniqueRoutes {
                 Naming.optionalShotNamed(body.shot()),
                 Naming.sideNamed(body.indicatorSide()),
                 body.windowMinutes().map(Duration::fromMinutes),
-                body.density());
+                body.density(),
+                Naming.distanceRuleNamed(body.distanceRule()));
     }
 
     private static SheetOut sheetOut(WeldId weld, TechniqueSheet sheet) {

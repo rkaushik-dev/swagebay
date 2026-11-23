@@ -1,5 +1,6 @@
 package io.github.rkaushikdev.swagebay.services;
 
+import io.github.rkaushikdev.swagebay.Context;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.identity.JobNumber;
 import io.github.rkaushikdev.swagebay.imaging.FilmSystem;
@@ -14,6 +15,8 @@ import io.github.rkaushikdev.swagebay.persistence.models.WeldRow;
 import io.github.rkaushikdev.swagebay.technique.TechniqueRequest;
 import io.github.rkaushikdev.swagebay.technique.TechniqueSheet;
 import io.github.rkaushikdev.swagebay.technique.Techniques;
+import io.github.rkaushikdev.swagebay.util.Text;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -64,7 +67,25 @@ public final class PlanningService {
                 .indicatorSide(request.indicatorSide())
                 .window(request.window())
                 .density(request.density())
+                .distanceRule(request.distanceRule())
                 .build());
+    }
+
+    /**
+     * The film keys in a comma separated list, each without its surrounding white space, the empty
+     * ones left out, in the order given.
+     *
+     * @throws ValidationError when that leaves none
+     */
+    public static List<String> filmKeys(String films) {
+        List<String> keys = Arrays.stream(films.split(",", -1))
+                .map(Text::strip)
+                .filter(key -> !key.isEmpty())
+                .toList();
+        if (keys.isEmpty()) {
+            throw new ValidationError("name at least one film to compare", Context.of("films", films));
+        }
+        return keys;
     }
 
     /**

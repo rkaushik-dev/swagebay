@@ -10,6 +10,7 @@ import io.github.rkaushikdev.swagebay.NotFoundError;
 import io.github.rkaushikdev.swagebay.TechniqueError;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.evaluation.Code;
+import io.github.rkaushikdev.swagebay.geometry.DistanceRule;
 import io.github.rkaushikdev.swagebay.geometry.PipeSchedule;
 import io.github.rkaushikdev.swagebay.geometry.ShotType;
 import io.github.rkaushikdev.swagebay.identity.JobNumber;
@@ -32,6 +33,24 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PlanningServiceTest {
+
+    @Test
+    void filmKeysAreReadOffACommaSeparatedListInOrder() {
+        assertThat(PlanningService.filmKeys(" d7, d5 ,,d4")).containsExactly("d7", "d5", "d4");
+        assertThatThrownBy(() -> PlanningService.filmKeys(" , "))
+                .isInstanceOf(ValidationError.class)
+                .hasMessageContaining("at least one film");
+    }
+
+    @Test
+    void aPlanCarriesItsDistanceRuleOntoEveryFilmItIsComparedOn() {
+        PlanRequest request = PlanRequest.builder(WELD, "IR-5512", "d7", SHOT)
+                .distanceRule(DistanceRule.ISO_17636_CLASS_A)
+                .build();
+        assertThat(request.onFilm("d4").distanceRule()).isSameAs(DistanceRule.ISO_17636_CLASS_A);
+        assertThat(PlanRequest.builder(WELD, "IR-5512", "d7", SHOT).build().distanceRule())
+                .isSameAs(DistanceRule.ASME_V);
+    }
 
     private static final LocalDateTime ASSAY = LocalDateTime.of(2024, 10, 1, 0, 0);
     private static final LocalDateTime SHOT = ASSAY.plusDays(20);

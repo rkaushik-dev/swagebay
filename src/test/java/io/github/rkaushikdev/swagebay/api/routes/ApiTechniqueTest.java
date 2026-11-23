@@ -132,6 +132,37 @@ class ApiTechniqueTest {
     }
 
     @Test
+    void anIsoDistanceRuleStandsTheSourceFurtherOff() {
+        long asme = api.postJson(TECHNIQUE, aPlan())
+                .json()
+                .get("source_to_film")
+                .get("um")
+                .asLong();
+        Map<String, Object> plan = aPlan();
+        plan.put("distance_rule", "ISO 17636-1 class B");
+        Http.Answer response = api.postJson(TECHNIQUE, plan);
+        assertThat(response.status()).isEqualTo(200);
+        assertThat(response.json().get("source_to_film").get("um").asLong()).isGreaterThan(asme);
+    }
+
+    @Test
+    void aPanoramicShotTooCloseForTheIsoRuleCarriesTheWarning() {
+        Map<String, Object> plan = aPlan(null);
+        plan.put("distance_rule", "iso_17636_class_b");
+        JsonNode body = api.postJson(TECHNIQUE, plan).json();
+        assertThat(texts(body.get("warnings"))).anyMatch(warning -> warning.endsWith("ISO 17636-1 class B asks for"));
+    }
+
+    @Test
+    void aDistanceRuleNothingKnowsAboutIsRefused() {
+        Map<String, Object> plan = aPlan();
+        plan.put("distance_rule", "eyeball");
+        Http.Answer response = api.postJson(TECHNIQUE, plan);
+        assertThat(response.status()).isEqualTo(422);
+        assertThat(response.json().get("context").get("given").asText()).isEqualTo("eyeball");
+    }
+
+    @Test
     void aSourceThatIsNotThereIsAFourOhFour() {
         Http.Answer response =
                 api.postJson(TECHNIQUE, Map.of("source_serial", "IR-9999", "film", "d7", "shot_at", SHOT));

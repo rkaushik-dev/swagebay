@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.evaluation.Code;
 import io.github.rkaushikdev.swagebay.evaluation.Kind;
+import io.github.rkaushikdev.swagebay.geometry.DistanceRule;
 import io.github.rkaushikdev.swagebay.geometry.ShotType;
 import io.github.rkaushikdev.swagebay.imaging.IndicatorSide;
 import io.github.rkaushikdev.swagebay.imaging.TechniqueClass;
@@ -25,7 +26,8 @@ class NamingTest {
             new Lookup<>(Code.class, Naming::codeNamed, Code::value),
             new Lookup<>(ShotType.class, Naming::shotNamed, ShotType::value),
             new Lookup<>(IndicatorSide.class, Naming::sideNamed, IndicatorSide::value),
-            new Lookup<>(TechniqueClass.class, Naming::techniqueClassNamed, TechniqueClass::value));
+            new Lookup<>(TechniqueClass.class, Naming::techniqueClassNamed, TechniqueClass::value),
+            new Lookup<>(DistanceRule.class, Naming::distanceRuleNamed, DistanceRule::value));
 
     private static <E extends Enum<E>> void roundTripsThroughItsValue(Lookup<E> lookup) {
         for (E member : lookup.kind().getEnumConstants()) {
@@ -52,6 +54,7 @@ class NamingTest {
         assertThat(Naming.shotNamed("dwsi")).isSameAs(ShotType.DWSI);
         assertThat(Naming.sideNamed("FILM")).isSameAs(IndicatorSide.FILM);
         assertThat(Naming.techniqueClassNamed("b")).isSameAs(TechniqueClass.B);
+        assertThat(Naming.distanceRuleNamed("iso_17636_class_a")).isSameAs(DistanceRule.ISO_17636_CLASS_A);
     }
 
     @Test

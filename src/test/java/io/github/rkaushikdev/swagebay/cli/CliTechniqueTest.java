@@ -116,6 +116,27 @@ class CliTechniqueTest {
     }
 
     @Test
+    void theDistanceRuleMovesTheSourceBack() {
+        String asme = plan("--shot", "double wall single image").out();
+        String iso = plan("--shot", "double wall single image", "--distance-rule", "ISO 17636-1 class B")
+                .out();
+        assertThat(asme).doesNotContain("asks for");
+        assertThat(iso).isNotEqualTo(asme).doesNotContain("asks for");
+    }
+
+    @Test
+    void aPanoramicSheetToClassBPrintsTheShortfall() {
+        assertThat(plan("--distance-rule", "iso_17636_class_b").out()).contains("ISO 17636-1 class B asks for");
+    }
+
+    @Test
+    void aDistanceRuleNothingKnowsAboutIsRefused() {
+        Shell.Result result = plan("--distance-rule", "eyeball");
+        assertThat(result.code()).isEqualTo(Main.EXIT_VALIDATION);
+        assertThat(result.failure()).isEqualTo(ValidationError.CODE);
+    }
+
+    @Test
     void aWeldThatIsNotThereIsNotFound() {
         Shell.Result result = shop.run("technique", "plan", "24-0001", "GW-999", "--source", "IR-5512", "--at", SHOT);
         assertThat(result.code()).isEqualTo(Main.EXIT_NOT_FOUND);
