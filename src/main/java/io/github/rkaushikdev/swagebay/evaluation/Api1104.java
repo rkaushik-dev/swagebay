@@ -4,6 +4,7 @@ import io.github.rkaushikdev.swagebay.ConfigurationError;
 import io.github.rkaushikdev.swagebay.Context;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.quantities.Length;
+import io.github.rkaushikdev.swagebay.util.Decimals;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -37,6 +38,9 @@ public final class Api1104 {
 
     /** Undercut this shallow is acceptable at any length. */
     public static final Length UNDERCUT_ALWAYS_ACCEPTABLE = Length.fromMm("0.4");
+
+    /** A sixth of a weld shorter than the window, which is what undercut is totalled against there. */
+    public static final BigDecimal UNDERCUT_SHORT_WELD_FRACTION = Decimals.divide(1, 6);
 
     private static final List<Criterion> CRITERIA = List.of(
             Criterion.builder(Kind.IP, "9.3.1")
@@ -99,7 +103,9 @@ public final class Api1104 {
             Criterion.builder(Kind.U, "9.3.11")
                     .maxLength(Length.fromInch(2))
                     .maxAggregate(Length.fromInch(2))
-                    .note("depth is capped at 0.8 mm or an eighth of the wall, whichever is smaller")
+                    .shortWeldFraction(UNDERCUT_SHORT_WELD_FRACTION)
+                    .note("depth is capped at 0.8 mm or an eighth of the wall, whichever is smaller,"
+                            + " and undercut no deeper than 0.4 mm is acceptable at any length")
                     .build(),
             Criterion.builder(Kind.AB, "9.3.12")
                     .note("an arc burn is removed and the area is examined again")
@@ -129,6 +135,25 @@ public final class Api1104 {
     /** Every row, in the order of the standard. */
     public static List<Criterion> allCriteria() {
         return CRITERIA;
+    }
+
+    /**
+     * Whether an indication is undercut measured no deeper than {@link #UNDERCUT_ALWAYS_ACCEPTABLE}.
+     *
+     * <p>Only a recorded depth can show that. Undercut with no depth on it is judged on length like
+     * any other, because the reader who did not measure it cannot say it was shallow.
+     *
+     * @throws ValidationError for a wall that is not positive
+     */
+    public static boolean isShallowUndercut(Indication indication, Length wall) {
+        if (wall.um() <= 0) {
+            throw new ValidationError("a wall thickness has to be positive");
+        }
+        return indication.kind() == Kind.U
+                && indication
+                        .depthFraction()
+                        .map(fraction -> wall.times(fraction).compareTo(UNDERCUT_ALWAYS_ACCEPTABLE) <= 0)
+                        .orElse(false);
     }
 
     /**

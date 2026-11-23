@@ -10,10 +10,12 @@ import static io.github.rkaushikdev.swagebay.quantities.Units.inch;
 import static io.github.rkaushikdev.swagebay.quantities.Units.mm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import io.github.rkaushikdev.swagebay.ConfigurationError;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.quantities.Length;
+import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -70,6 +72,28 @@ class Api1104Test {
         assertThat(row.maxLength()).contains(mm(4));
         assertThat(row.note()).contains("crater");
         assertThat(Kind.C.isAlwaysRejectable()).isTrue();
+    }
+
+    @Test
+    void undercutIsTotalledAgainstASixthOfAShortWeld() {
+        Criterion row = criterion(Kind.U);
+        assertThat(row.shortWeldFraction())
+                .hasValueSatisfying(fraction -> assertThat(fraction.multiply(BigDecimal.valueOf(6)))
+                        .isCloseTo(BigDecimal.ONE, within(new BigDecimal("1e-20"))));
+        assertThat(row.note()).contains("0.4 mm");
+    }
+
+    @Test
+    void onlyARecordedDepthMakesUndercutShallow() {
+        Indication measured = new Indication(Kind.U, mm(0), mm(30)).withDepthFraction(new BigDecimal("0.04"));
+        assertThat(Api1104.isShallowUndercut(measured, mm(10))).isTrue();
+        assertThat(Api1104.isShallowUndercut(measured, mm(11))).isFalse();
+        assertThat(Api1104.isShallowUndercut(new Indication(Kind.U, mm(0), mm(30)), mm(10)))
+                .isFalse();
+        Indication slag = new Indication(Kind.ESI, mm(0), mm(30)).withDepthFraction(new BigDecimal("0.01"));
+        assertThat(Api1104.isShallowUndercut(slag, mm(10))).isFalse();
+        assertThatThrownBy(() -> Api1104.isShallowUndercut(measured, Length.ZERO))
+                .isInstanceOf(ValidationError.class);
     }
 
     @Test

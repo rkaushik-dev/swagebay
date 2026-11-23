@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -91,39 +92,23 @@ public record Assessment(Disposition disposition, List<Finding> findings, Length
 
     private static List<Finding> checkKind(IndicationSet found, Kind kind, Length wall) {
         Criterion row = Api1104.criterion(kind);
-        List<Indication> present = found.ofKind(kind);
+        List<Indication> present = judgedOnLength(found.ofKind(kind), wall);
         List<Finding> out = new ArrayList<>();
-
-        Optional<Length> limit = row.individualLengthLimit(wall);
-        if (limit.isPresent()) {
-            for (Indication indication : present) {
-                if (indication.size().compareTo(limit.get()) > 0) {
-                    out.add(new Finding(
-                            row.clause(),
-                            kind,
-                            indication.size().formatMm(1) + " is over the "
-                                    + limit.get().formatMm(1) + " allowed for one",
-                            List.of(indication)));
-                }
-            }
-        }
-
-        if (row.maxWidth().isPresent()) {
-            Length maxWidth = row.maxWidth().get();
-            for (Indication indication : present) {
-                if (indication.width().compareTo(maxWidth) > 0) {
-                    out.add(new Finding(
-                            row.clause(),
-                            kind,
-                            indication.width().formatMm(1) + " across is over the " + maxWidth.formatMm(1) + " allowed",
-                            List.of(indication)));
-                }
-            }
-        }
+        row.individualLengthLimit(wall)
+                .ifPresent(limit -> out.addAll(
+                        overCap(row, present, limit, Indication::size, " is over the ", " allowed for one")));
+        row.maxWidth()
+                .ifPresent(limit -> out.addAll(
+                        overCap(row, present, limit, Indication::width, " across is over the ", " allowed")));
 
         if (row.maxAggregate().isPresent() && kind.isAggregated()) {
-            out.addAll(
-                    checkAggregate(found, kind, row.clause(), row.maxAggregate().get(), row.shortWeldFraction()));
+            out.addAll(checkAggregate(
+                    present,
+                    found.weldLength(),
+                    kind,
+                    row.clause(),
+                    row.maxAggregate().get(),
+                    row.shortWeldFraction()));
         }
 
         if (row.maxCount().isPresent()) {
@@ -137,14 +122,49 @@ public record Assessment(Disposition disposition, List<Finding> findings, Length
         return out;
     }
 
+    /**
+     * The indications of one kind that the length rules apply to.
+     *
+     * <p>Undercut measured no deeper than {@link Api1104#UNDERCUT_ALWAYS_ACCEPTABLE} is acceptable
+     * at any length, so it is left out of the length and the aggregate before they are worked out.
+     * Undercut with no depth recorded cannot be shown to be that shallow and stays in.
+     */
+    private static List<Indication> judgedOnLength(List<Indication> present, Length wall) {
+        return present.stream()
+                .filter(indication -> !Api1104.isShallowUndercut(indication, wall))
+                .toList();
+    }
+
+    /** One finding for every indication whose measured dimension is over the cap. */
+    private static List<Finding> overCap(
+            Criterion row,
+            List<Indication> present,
+            Length cap,
+            Function<Indication, Length> dimension,
+            String over,
+            String allowed) {
+        return present.stream()
+                .filter(indication -> dimension.apply(indication).compareTo(cap) > 0)
+                .map(indication -> new Finding(
+                        row.clause(),
+                        row.kind(),
+                        dimension.apply(indication).formatMm(1) + over + cap.formatMm(1) + allowed,
+                        List.of(indication)))
+                .toList();
+    }
+
     private static List<Finding> checkAggregate(
-            IndicationSet found, Kind kind, String clause, Length allowed, Optional<BigDecimal> shortWeldFraction) {
-        List<Indication> present = found.ofKind(kind);
+            List<Indication> present,
+            Length weldLength,
+            Kind kind,
+            String clause,
+            Length allowed,
+            Optional<BigDecimal> shortWeldFraction) {
         if (present.isEmpty()) {
             return List.of();
         }
-        if (Aggregates.windowApplies(found.weldLength())) {
-            Window window = Aggregates.worstWindow(present, found.weldLength());
+        if (Aggregates.windowApplies(weldLength)) {
+            Window window = Aggregates.worstWindow(present, weldLength);
             if (window.aggregate().compareTo(allowed) > 0) {
                 return List.of(new Finding(
                         clause,
@@ -158,8 +178,8 @@ public record Assessment(Disposition disposition, List<Finding> findings, Length
         if (shortWeldFraction.isEmpty()) {
             return List.of();
         }
-        Length total = found.totalLengthOf(kind);
-        BigDecimal fraction = Aggregates.fractionOfWeld(total, found.weldLength());
+        Length total = present.stream().map(Indication::length).reduce(Length.ZERO, Length::plus);
+        BigDecimal fraction = Aggregates.fractionOfWeld(total, weldLength);
         if (fraction.compareTo(shortWeldFraction.get()) > 0) {
             return List.of(new Finding(
                     clause,

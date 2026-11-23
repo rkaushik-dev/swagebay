@@ -186,6 +186,61 @@ class AssessmentTest {
     }
 
     @Test
+    void undercutNoDeeperThanFourTenthsOfAMillimetreRunsAtAnyLength() {
+        Indication shallow = new Indication(Kind.U, mm(0), mm(300)).withDepthFraction(new BigDecimal("0.04"));
+        Assessment verdict = assess(weld(shallow), mm(10));
+        assertThat(verdict.accepted()).isTrue();
+        assertThat(verdict.findings()).isEmpty();
+    }
+
+    @Test
+    void undercutJustDeeperThanFourTenthsIsStillJudgedOnLength() {
+        Indication deeper = new Indication(Kind.U, mm(0), mm(300)).withDepthFraction(new BigDecimal("0.041"));
+        Assessment verdict = assess(weld(deeper), mm(10));
+        assertThat(verdict.disposition()).isSameAs(Disposition.REPAIR);
+        assertThat(verdict.findings())
+                .extracting(Finding::reason)
+                .anySatisfy(reason -> assertThat(reason).contains("300.0 mm is over the 50.8 mm allowed for one"))
+                .anySatisfy(reason -> assertThat(reason).endsWith("allowed in 305 mm"));
+    }
+
+    @Test
+    void longUndercutWithNoDepthRecordedIsJudgedOnLength() {
+        Assessment verdict = assess(weld(new Indication(Kind.U, mm(0), mm(300))), mm(10));
+        assertThat(verdict.accepted()).isFalse();
+        assertThat(verdict.clauses()).containsExactly("9.3.11");
+    }
+
+    @Test
+    void shallowUndercutDoesNotCountTowardsTheAggregateOfTheDeeperOnes() {
+        Indication deep = new Indication(Kind.U, mm(0), mm(40)).withDepthFraction(new BigDecimal("0.05"));
+        Indication shallow = new Indication(Kind.U, mm(60), mm(40)).withDepthFraction(new BigDecimal("0.03"));
+        assertThat(assess(weld(deep, shallow), mm(10)).accepted()).isTrue();
+        Indication alsoDeep = new Indication(Kind.U, mm(60), mm(40)).withDepthFraction(new BigDecimal("0.05"));
+        assertThat(assess(weld(deep, alsoDeep), mm(10)).accepted()).isFalse();
+    }
+
+    @Test
+    void onAShortWeldUndercutIsTotalledAgainstASixthOfIt() {
+        Indication undercut = new Indication(Kind.U, mm(0), mm(40));
+        assertThat(assess(weld(250, undercut), mm(10)).accepted()).isTrue();
+        Assessment verdict = assess(weld(200, undercut), mm(10));
+        assertThat(verdict.accepted()).isFalse();
+        assertThat(verdict.findings().get(0).reason()).isEqualTo("40.0 mm is 20.0% of a short weld, over 17%");
+    }
+
+    @Test
+    void theWidthAndTheLengthOfOneInclusionAreSeparateFindings() {
+        Assessment verdict = assess(weld(slag(100, 60, 3)), WALL);
+        assertThat(verdict.findings())
+                .extracting(Finding::reason)
+                .containsExactly(
+                        "60.0 mm is over the 50.8 mm allowed for one",
+                        "3.0 mm across is over the 1.6 mm allowed",
+                        "60.0 mm in the 305 mm from 0 mm is over the 50.8 mm allowed in 305 mm");
+    }
+
+    @Test
     void aWallOfNothingIsRefusedBeforeAnythingIsAssessed() {
         assertThatThrownBy(() -> assess(weld(), Length.ZERO)).isInstanceOf(ValidationError.class);
     }
