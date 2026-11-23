@@ -162,4 +162,49 @@ class RepairTest {
         assertThat(register.repeatOffenders()).isEmpty();
         assertThat(register.rateOver(50)).isEqualByComparingTo("0");
     }
+
+    private static Repair cut(String weld, long from, long to, boolean approved) {
+        return new Repair(WeldId.parse(weld), new Excavation(mm(from), mm(to)), "w-19", WHEN, approved);
+    }
+
+    @Test
+    void theLengthRateCountsWeldCutOutOverWeldExamined() {
+        RepairRegister register = new RepairRegister();
+        register.record(cut("GW-104R1", 100, 160, false));
+        register.record(cut("GW-110R1", 0, 40, false));
+        assertThat(register.excavatedLength()).isEqualTo(mm(100));
+        assertThat(register.lengthRateOver(Length.fromM(10))).isEqualByComparingTo("0.01");
+    }
+
+    @Test
+    void aSecondRoundAddsItsCutToTheLengthButNotToTheCount() {
+        RepairRegister register = new RepairRegister();
+        register.record(cut("GW-104R1", 100, 160, false));
+        register.record(cut("GW-104R2", 90, 170, true));
+        assertThat(register.excavatedLength()).isEqualTo(mm(140));
+        assertThat(register.rateOver(10)).isEqualByComparingTo("0.1");
+        assertThat(register.lengthRateOver(mm(1400))).isEqualByComparingTo("0.1");
+    }
+
+    @Test
+    void aLengthRateNeedsALengthExamined() {
+        RepairRegister register = new RepairRegister();
+        assertThat(register.excavatedLength()).isEqualTo(Length.ZERO);
+        assertThat(register.lengthRateOver(mm(500))).isEqualByComparingTo("0");
+        assertThatThrownBy(() -> register.lengthRateOver(Length.ZERO)).isInstanceOf(ValidationError.class);
+    }
+
+    @Test
+    void theRoundsAreFoundFromAnyRoundOfTheWeld() {
+        RepairRegister register = new RepairRegister();
+        register.record(cut("GW-104R2", 0, 10, true));
+        register.record(cut("GW-104R1", 0, 10, false));
+        register.record(cut("GW-099R1", 0, 10, false));
+        assertThat(register.roundsFor(WeldId.parse("GW-104R2"))).containsExactly(1, 2);
+        assertThat(register.roundsFor(WeldId.parse("GW-104"))).containsExactly(1, 2);
+        assertThat(register.repairedWelds()).extracting(WeldId::toString).containsExactly("GW-99", "GW-104");
+        assertThat(register.repairs())
+                .extracting(repair -> repair.weld().toString())
+                .containsExactly("GW-104R2", "GW-104R1", "GW-99R1");
+    }
 }

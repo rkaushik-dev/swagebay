@@ -4,13 +4,16 @@ import io.github.rkaushikdev.swagebay.ConflictError;
 import io.github.rkaushikdev.swagebay.Context;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.identity.WeldId;
+import io.github.rkaushikdev.swagebay.quantities.Length;
 import io.github.rkaushikdev.swagebay.util.Decimals;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -27,6 +30,7 @@ public final class RepairRegister {
     public static final int REPAIRS_WITHOUT_APPROVAL = 1;
 
     private final List<Repair> repairs = new ArrayList<>();
+    private final Map<WeldId, List<Repair>> byWeld = new TreeMap<>(Comparator.comparing(WeldId::toString));
 
     /** An empty register. */
     public RepairRegister() {}
@@ -38,8 +42,7 @@ public final class RepairRegister {
      *     client's approval
      */
     public void record(Repair repair) {
-        List<Integer> rounds = roundsFor(repair.weld().original());
-        if (rounds.contains(repair.round())) {
+        if (roundsFor(repair.weld()).contains(repair.round())) {
             throw new ConflictError(
                     "that repair round is already recorded",
                     Context.of("weld", repair.weld().toString()));
@@ -50,6 +53,8 @@ public final class RepairRegister {
                     Context.of("weld", repair.weld().toString(), "round", repair.round()));
         }
         repairs.add(repair);
+        byWeld.computeIfAbsent(repair.weld().original(), ignored -> new ArrayList<>())
+                .add(repair);
     }
 
     /** Every repair, in the order recorded. */
@@ -59,9 +64,7 @@ public final class RepairRegister {
 
     /** The rounds recorded against a weld, whichever round of it is named, in order. */
     public List<Integer> roundsFor(WeldId weld) {
-        WeldId original = weld.original();
-        return repairs.stream()
-                .filter(repair -> repair.weld().original().equals(original))
+        return byWeld.getOrDefault(weld.original(), List.of()).stream()
                 .map(Repair::round)
                 .sorted()
                 .toList();
@@ -69,9 +72,7 @@ public final class RepairRegister {
 
     /** Every weld that has been repaired at least once, as first made. */
     public Set<WeldId> repairedWelds() {
-        Set<WeldId> welds = new TreeSet<>();
-        repairs.forEach(repair -> welds.add(repair.weld().original()));
-        return Collections.unmodifiableSet(welds);
+        return Collections.unmodifiableSet(new TreeSet<>(byWeld.keySet()));
     }
 
     /**
@@ -83,14 +84,37 @@ public final class RepairRegister {
         if (weldsShot <= 0) {
             throw new ValidationError("a repair rate needs a denominator", Context.of("welds_shot", weldsShot));
         }
-        return Decimals.divide(repairedWelds().size(), weldsShot);
+        return Decimals.divide(byWeld.size(), weldsShot);
+    }
+
+    /** The length of weld cut out over every round, which is what a length based rate counts. */
+    public Length excavatedLength() {
+        return repairs.stream().map(repair -> repair.excavation().length()).reduce(Length.ZERO, Length::plus);
+    }
+
+    /**
+     * Weld cut out over weld examined, the rate a pipeline contract quotes instead of a count of
+     * welds because one long cut on one weld is worse than a short one on two.
+     *
+     * <p>Every round counts, so a weld cut out twice adds both cuts. That is deliberate: the
+     * contract pays for the length rewelded, and the second round is rewelded too.
+     *
+     * @throws ValidationError for no length examined
+     */
+    public BigDecimal lengthRateOver(Length examined) {
+        if (examined.um() <= 0) {
+            throw new ValidationError(
+                    "a repair rate needs a length examined",
+                    Context.of("examined_mm", examined.mm().toString()));
+        }
+        return excavatedLength().ratio(examined);
     }
 
     /** The welds repaired more than once, in the order of their identifiers' text. */
     public List<WeldId> repeatOffenders() {
-        return repairedWelds().stream()
-                .filter(weld -> roundsFor(weld).size() > 1)
-                .sorted(Comparator.comparing(WeldId::toString))
+        return byWeld.entrySet().stream()
+                .filter(entry -> entry.getValue().size() > 1)
+                .map(Map.Entry::getKey)
                 .toList();
     }
 }
