@@ -12,6 +12,7 @@ import io.github.rkaushikdev.swagebay.evaluation.Disposition;
 import io.github.rkaushikdev.swagebay.evaluation.Indication;
 import io.github.rkaushikdev.swagebay.evaluation.IndicationSet;
 import io.github.rkaushikdev.swagebay.evaluation.Kind;
+import io.github.rkaushikdev.swagebay.evaluation.SpotExamination;
 import io.github.rkaushikdev.swagebay.identity.JobNumber;
 import io.github.rkaushikdev.swagebay.identity.WeldId;
 import io.github.rkaushikdev.swagebay.imaging.Admissibility;
@@ -204,5 +205,59 @@ class RecordsTest {
         assertThat(film().describe()).isEqualTo("R-001 read by 0142, 0 indications");
         assertThat(film("R-001", 1, GOOD, List.of(), false).describe()).isEqualTo("R-001 admissible, not yet read");
         assertThat(film("R-001", 1, BAD, List.of(), false).describe()).contains("not admissible");
+    }
+
+    private static WeldRecord spotIncrement() {
+        return new WeldRecord(JobNumber.parse("24-0417"), WELD, mm(3000), mm(15), Code.ASME_VIII_SPOT);
+    }
+
+    private static Indication fusion() {
+        return new Indication(Kind.IF, mm(100), mm(3));
+    }
+
+    @Test
+    void aSpotExaminedWeldIsJudgedSpotBySpot() {
+        WeldRecord increment = spotIncrement();
+        assertThat(increment.spotStanding()).isEqualTo(new SpotExamination.NotShot());
+        increment.add(film("R-001", 1, List.of(fusion())));
+        assertThat(increment.spotStanding()).isEqualTo(new SpotExamination.TracersDue(2));
+        increment.add(film("R-002", 2));
+        increment.add(film("R-003", 3));
+        assertThat(increment.spotStanding()).isEqualTo(new SpotExamination.RepairDue(0));
+        increment.add(film("R-004", 4));
+        assertThat(increment.spotStanding()).isEqualTo(new SpotExamination.Accepted(true));
+    }
+
+    @Test
+    void aFailedTracerRejectsTheIncrementWhateverItsNeighboursSay() {
+        WeldRecord increment = spotIncrement();
+        increment.add(film("R-002", 2, List.of(fusion())));
+        increment.add(film("R-001", 1, List.of(fusion())));
+        assertThat(increment.spotStanding()).isEqualTo(new SpotExamination.Rejected(1));
+    }
+
+    @Test
+    void aSpotNobodyCanReadStopsTheCount() {
+        WeldRecord increment = spotIncrement();
+        increment.add(film("R-001", 1, List.of(fusion())));
+        increment.add(film("R-002", 2, BAD));
+        increment.add(film("R-003", 3, GOOD, List.of(), false));
+        assertThat(increment.spotStanding()).isEqualTo(new SpotExamination.TracersDue(2));
+    }
+
+    @Test
+    void onlyASpotExaminedWeldHasAProgressiveStanding() {
+        assertThatThrownBy(() -> weldRecord().spotStanding())
+                .isInstanceOf(ValidationError.class)
+                .hasMessageContaining("spot examined");
+    }
+
+    @Test
+    void theBlockersRefuseANonsenseCountToo() {
+        assertThatThrownBy(() -> weldRecord().blockers(0)).isInstanceOf(ValidationError.class);
+        WeldRecord record = weldRecord();
+        record.add(film());
+        assertThat(record.blockers(1)).isEmpty();
+        assertThat(record.isIncomplete(1)).isFalse();
     }
 }

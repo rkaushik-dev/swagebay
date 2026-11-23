@@ -60,17 +60,7 @@ public record Assessment(Disposition disposition, List<Finding> findings, Length
                 .forEach(kind -> findings.addAll(checkKind(found, kind, wall)));
         findings.addAll(checkUndercutDepth(found, wall));
         findings.addAll(checkAccumulation(found));
-        return new Assessment(dispositionOf(findings), findings, wall);
-    }
-
-    /** Accept with no findings, reject when any finding is against a kind that is always rejectable, repair otherwise. */
-    static Disposition dispositionOf(List<Finding> findings) {
-        if (findings.isEmpty()) {
-            return Disposition.ACCEPT;
-        }
-        return findings.stream().anyMatch(finding -> finding.kind().isAlwaysRejectable())
-                ? Disposition.REJECT
-                : Disposition.REPAIR;
+        return new Assessment(Disposition.of(findings), findings, wall);
     }
 
     /** Whether the weld is accepted. */

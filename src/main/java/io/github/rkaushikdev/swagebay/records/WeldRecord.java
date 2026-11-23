@@ -8,12 +8,14 @@ import io.github.rkaushikdev.swagebay.evaluation.Code;
 import io.github.rkaushikdev.swagebay.evaluation.Disposition;
 import io.github.rkaushikdev.swagebay.evaluation.Indication;
 import io.github.rkaushikdev.swagebay.evaluation.IndicationSet;
+import io.github.rkaushikdev.swagebay.evaluation.SpotExamination;
 import io.github.rkaushikdev.swagebay.evaluation.Verdict;
 import io.github.rkaushikdev.swagebay.identity.JobNumber;
 import io.github.rkaushikdev.swagebay.identity.WeldId;
 import io.github.rkaushikdev.swagebay.quantities.Length;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -143,17 +145,18 @@ public final class WeldRecord {
      * @throws ValidationError for fewer than one expected exposure
      */
     public boolean isIncomplete(int expectedExposures) {
+        return !blockers(expectedExposures).isEmpty();
+    }
+
+    /**
+     * Why there is no verdict yet, in the words a coordinator would use.
+     *
+     * @throws ValidationError for fewer than one expected exposure
+     */
+    public List<String> blockers(int expectedExposures) {
         if (expectedExposures < 1) {
             throw new ValidationError("a weld needs at least one exposure");
         }
-        if (radiographs.size() < expectedExposures) {
-            return true;
-        }
-        return !inadmissible().isEmpty() || !unread().isEmpty();
-    }
-
-    /** Why there is no verdict yet, in the words a coordinator would use. */
-    public List<String> blockers(int expectedExposures) {
         List<String> out = new ArrayList<>();
         int missing = expectedExposures - radiographs.size();
         if (missing > 0) {
@@ -166,6 +169,31 @@ public final class WeldRecord {
             out.add(radiograph.number() + " has not been read");
         }
         return List.copyOf(out);
+    }
+
+    /**
+     * Where a spot examined increment stands under UW-52(d), judging each spot on its own in the
+     * order it was shot. A spot that is not admissible or not yet read stops the count there, since
+     * nobody can say what it would have set off.
+     *
+     * @throws ValidationError for a weld that is not worked to spot radiography
+     */
+    public SpotExamination.Standing spotStanding() {
+        if (code != Code.ASME_VIII_SPOT) {
+            throw new ValidationError(
+                    "progressive examination is for a spot examined weld", Context.of("code", code.value()));
+        }
+        List<Disposition> spots = new ArrayList<>();
+        for (Radiograph spot : radiographs.stream()
+                .sorted(Comparator.comparingInt(Radiograph::exposureIndex))
+                .toList()) {
+            if (!spot.isAdmissible() || !spot.hasBeenRead()) {
+                break;
+            }
+            spots.add(Acceptance.judge(code, new IndicationSet(weldLength, spot.indications()), wall)
+                    .disposition());
+        }
+        return SpotExamination.standing(spots);
     }
 
     /**

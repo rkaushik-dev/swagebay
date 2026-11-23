@@ -34,7 +34,7 @@ public final class Acceptance {
                     case ASME_VIII -> fromUw51(found, wall);
                     case ASME_VIII_SPOT -> AsmeUw52.evaluate(found, wall);
                 };
-        return new Verdict(code, Assessment.dispositionOf(findings), findings, wall);
+        return new Verdict(code, Disposition.of(findings), findings, wall);
     }
 
     /**
