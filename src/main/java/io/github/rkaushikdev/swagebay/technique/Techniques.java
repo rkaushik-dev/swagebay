@@ -12,6 +12,7 @@ import io.github.rkaushikdev.swagebay.exposure.ExposureResult;
 import io.github.rkaushikdev.swagebay.geometry.BeamGeometry;
 import io.github.rkaushikdev.swagebay.geometry.Coverage;
 import io.github.rkaushikdev.swagebay.geometry.CoveragePlan;
+import io.github.rkaushikdev.swagebay.geometry.DistanceRule;
 import io.github.rkaushikdev.swagebay.geometry.Joint;
 import io.github.rkaushikdev.swagebay.geometry.ShotType;
 import io.github.rkaushikdev.swagebay.geometry.Shots;
@@ -78,15 +79,24 @@ public final class Techniques {
      * other way round.
      */
     public static BeamGeometry geometryFor(Joint joint, ShotType shot, Length focal) {
-        if (shot == ShotType.PANORAMIC) {
-            return new BeamGeometry(joint.insideDiameter().dividedBy(2), joint.wall(), focal);
-        }
-        if (shot == ShotType.SWSI) {
-            return new BeamGeometry(joint.insideDiameter(), joint.wall(), focal);
-        }
-        Length gap = shot == ShotType.CONTACT ? joint.wall() : joint.od();
-        Length sfd = BeamGeometry.minimumSourceToFilm(focal, gap, joint.wall());
-        return BeamGeometry.fromSfd(sfd, gap, focal);
+        return geometryFor(joint, shot, focal, DistanceRule.ASME_V);
+    }
+
+    /**
+     * Where the source ends up when the procedure sets the distance by that rule. An inside shot is
+     * placed the same whatever the rule; an outside one stands off by the rule's minimum.
+     */
+    public static BeamGeometry geometryFor(Joint joint, ShotType shot, Length focal, DistanceRule rule) {
+        return switch (shot) {
+            case PANORAMIC -> new BeamGeometry(joint.insideDiameter().dividedBy(2), joint.wall(), focal);
+            case SWSI -> new BeamGeometry(joint.insideDiameter(), joint.wall(), focal);
+            case CONTACT -> standOff(joint, joint.wall(), focal, rule);
+            case DWSI, DWDI_ELLIPTICAL, DWDI_SUPERIMPOSED -> standOff(joint, joint.od(), focal, rule);
+        };
+    }
+
+    private static BeamGeometry standOff(Joint joint, Length gap, Length focal, DistanceRule rule) {
+        return BeamGeometry.fromSfd(rule.minimumSourceToFilm(focal, gap, joint.wall()), gap, focal);
     }
 
     /**

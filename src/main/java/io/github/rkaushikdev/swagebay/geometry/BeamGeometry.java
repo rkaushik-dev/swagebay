@@ -118,8 +118,7 @@ public record BeamGeometry(Length sourceToObject, Length objectToFilm, Length fo
 
     /** What the technique sheet writes in the distance box: the minimum source distance plus the gap. */
     public static Length minimumSourceToFilm(Length focalSize, Length objectToFilm, Length materialThickness) {
-        Length limit = unsharpnessLimit(materialThickness);
-        return minimumSourceToObject(focalSize, objectToFilm, limit).plus(objectToFilm);
+        return DistanceRule.ASME_V.minimumSourceToFilm(focalSize, objectToFilm, materialThickness);
     }
 
     /** Source to object plus object to film. */
@@ -139,6 +138,18 @@ public record BeamGeometry(Length sourceToObject, Length objectToFilm, Length fo
 
     /** Whether the unsharpness is inside the limit for that thickness. */
     public boolean meets(Length materialThickness) {
+        return meets(DistanceRule.ASME_V, materialThickness);
+    }
+
+    /**
+     * Whether the geometry satisfies that rule at that thickness: the unsharpness inside the limit
+     * under ASME, the source at least the minimum distance off the weld under ISO.
+     */
+    public boolean meets(DistanceRule rule, Length materialThickness) {
+        if (rule.isIso()) {
+            return sourceToObject.compareTo(rule.minimumSourceToObject(focalSize, objectToFilm, materialThickness))
+                    >= 0;
+        }
         return geometricUnsharpness().compareTo(unsharpnessLimit(materialThickness)) <= 0;
     }
 
