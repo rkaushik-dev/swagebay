@@ -6,6 +6,7 @@ import io.github.rkaushikdev.swagebay.quantities.Activity;
 import io.github.rkaushikdev.swagebay.quantities.DoseRate;
 import io.github.rkaushikdev.swagebay.quantities.Length;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,11 +19,12 @@ public final class Devices {
     private static final Map<String, Collimator> COLLIMATORS = new LinkedHashMap<>();
 
     static {
-        addDevice("880d", "880 Delta", "QSA", "ir192", 130, "1.8", 18, "22.2", 12, "II");
-        addDevice("880s", "880 Sigma", "QSA", "ir192", 150, "1.9", 19, "24.5", 12, "II");
-        addDevice("tsi3", "Gammamat TSI 3", "Isotopen", "ir192", 120, "1.5", 15, "18.0", 9, "II");
-        addDevice("spec150", "SPEC 150", "SPEC", "se75", 100, "0.9", 9, "11.3", 9, "I");
-        addDevice("tk100", "Gammamat TK 100", "Isotopen", "co60", 45, "1.9", 19, "118.0", 6, "II");
+        device("880d", "880 Delta", "QSA", "22.2", 12, "II", "ir192 130 1.8 18");
+        device("880s", "880 Sigma", "QSA", "24.5", 12, "II", "ir192 150 1.9 19");
+        device("880e", "880 Elite", "QSA", "20.9", 12, "II", "ir192 150 1.9 19", "se75 80 0.5 5");
+        device("tsi3", "Gammamat TSI 3", "Isotopen", "18.0", 9, "II", "ir192 120 1.5 15");
+        device("spec150", "SPEC 150", "SPEC", "11.3", 9, "I", "se75 100 0.9 9");
+        device("tk100", "Gammamat TK 100", "Isotopen", "118.0", 6, "II", "co60 45 1.9 19");
 
         addCollimator(new Collimator("none", "no collimator", "none", 360, BigDecimal.ONE, BigDecimal.ZERO));
         addCollimator(new Collimator(
@@ -71,37 +73,46 @@ public final class Devices {
         return COLLIMATORS.keySet().stream().sorted().toList();
     }
 
-    /** The device models certified for an isotope, biggest capacity first. */
+    /** The device models certified for an isotope, biggest capacity for it first. */
     public static List<DeviceModel> devicesFor(Isotope sourceIsotope) {
         return DEVICES.values().stream()
-                .filter(model -> model.isotopeKey().equals(sourceIsotope.key()))
-                .sorted(Comparator.comparingLong(
-                                (DeviceModel model) -> model.capacity().bq())
+                .filter(model -> model.certificationFor(sourceIsotope).isPresent())
+                .sorted(Comparator.comparingLong((DeviceModel model) -> model.certificationFor(sourceIsotope)
+                                .orElseThrow()
+                                .capacity()
+                                .bq())
                         .reversed())
                 .toList();
     }
 
-    private static void addDevice(
+    /**
+     * One model as its type approval reads: the body, then a line per isotope with the capacity in
+     * curies, the surface rate in millisieverts an hour and the rate at a metre in microsieverts an
+     * hour, each with a full load of that isotope.
+     */
+    private static void device(
             String key,
             String name,
             String manufacturer,
-            String isotopeKey,
-            long capacityCurie,
-            String surfaceMsvPerHour,
-            long metreUsvPerHour,
             String massKg,
             long maxGuideTubeM,
-            String isoCategory) {
+            String isoCategory,
+            String... lines) {
+        List<DeviceModel.Certification> certifications = Arrays.stream(lines)
+                .map(line -> line.trim().split("\\s+"))
+                .map(cells -> new DeviceModel.Certification(
+                        cells[0],
+                        Activity.fromCurie(Long.parseLong(cells[1])),
+                        DoseRate.fromMsvPerHour(cells[2]),
+                        DoseRate.fromUsvPerHour(Long.parseLong(cells[3]))))
+                .toList();
         DEVICES.put(
                 key,
                 new DeviceModel(
                         key,
                         name,
                         manufacturer,
-                        isotopeKey,
-                        Activity.fromCurie(capacityCurie),
-                        DoseRate.fromMsvPerHour(surfaceMsvPerHour),
-                        DoseRate.fromUsvPerHour(metreUsvPerHour),
+                        certifications,
                         new BigDecimal(massKg),
                         Length.fromM(maxGuideTubeM),
                         isoCategory));

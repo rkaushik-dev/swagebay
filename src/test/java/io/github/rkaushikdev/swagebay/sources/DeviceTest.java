@@ -16,6 +16,7 @@ import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.quantities.Length;
 import io.github.rkaushikdev.swagebay.util.Decimals;
 import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class DeviceTest {
@@ -71,8 +72,8 @@ class DeviceTest {
 
     @Test
     void devicesForAnIsotopeComeBackBiggestFirst() {
-        assertThat(devicesFor(IR192)).extracting(DeviceModel::key).containsExactly("880s", "880d", "tsi3");
-        assertThat(devicesFor(SE75)).extracting(DeviceModel::key).containsExactly("spec150");
+        assertThat(devicesFor(IR192)).extracting(DeviceModel::key).containsExactly("880s", "880e", "880d", "tsi3");
+        assertThat(devicesFor(SE75)).extracting(DeviceModel::key).containsExactly("spec150", "880e");
         assertThat(devicesFor(CO60)).extracting(DeviceModel::key).containsExactly("tk100");
     }
 
@@ -129,9 +130,56 @@ class DeviceTest {
 
     @Test
     void bothCataloguesAreClosed() {
-        assertThat(Devices.knownDevices()).containsExactly("880d", "880s", "spec150", "tk100", "tsi3");
+        assertThat(Devices.knownDevices()).containsExactly("880d", "880e", "880s", "spec150", "tk100", "tsi3");
         assertThat(Devices.knownCollimators()).containsExactly("du45", "none", "w60", "w90");
         assertThatThrownBy(() -> deviceModel("880z")).isInstanceOf(ConfigurationError.class);
         assertThatThrownBy(() -> collimator("lead pipe")).isInstanceOf(ConfigurationError.class);
+    }
+
+    @Test
+    void theEliteIsCertifiedForSeleniumAsWellAsIridium() {
+        DeviceModel elite = deviceModel("880e");
+        assertThat(elite.certifications())
+                .extracting(DeviceModel.Certification::isotopeKey)
+                .containsExactly("ir192", "se75");
+        assertThat(elite.isotopeKey()).isEqualTo("ir192");
+        assertThat(elite.isotope()).isSameAs(IR192);
+        assertThat(elite.capacity()).isEqualTo(curie(150));
+        assertThat(elite.accepts(SE75, curie(80))).isTrue();
+        assertThat(elite.accepts(SE75, curie(81))).isFalse();
+        assertThat(elite.accepts(IR192, curie(150))).isTrue();
+        assertThat(elite.accepts(CO60, curie(1))).isFalse();
+    }
+
+    @Test
+    void eachIsotopeIsHeldToItsOwnLineOfTheCertificate() {
+        DeviceModel elite = deviceModel("880e");
+        elite.checkLoad(SE75, curie(80));
+        assertThatThrownBy(() -> elite.checkLoad(SE75, curie(100)))
+                .isInstanceOfSatisfying(ConfigurationError.class, caught -> assertThat(
+                                caught.context().get("capacity_ci"))
+                        .isEqualTo("80"));
+        assertThatThrownBy(() -> elite.checkLoad(CO60, curie(10)))
+                .isInstanceOfSatisfying(ConfigurationError.class, caught -> assertThat(
+                                caught.context().get("certified_for"))
+                        .isEqualTo("ir192, se75"));
+    }
+
+    @Test
+    void theRateAtAMetreScalesOnTheLineForTheIsotopeLoaded() {
+        DeviceModel elite = deviceModel("880e");
+        assertThat(elite.metreRateWith(SE75, curie(40))).isEqualTo(usvPerHour("2.5"));
+        assertThat(elite.metreRateWith(IR192, curie(75))).isEqualTo(elite.metreRateWith(curie(75)));
+        assertThatThrownBy(() -> elite.metreRateWith(CO60, curie(1))).isInstanceOf(ConfigurationError.class);
+    }
+
+    @Test
+    void aCertificateCoversAtLeastOneIsotopeAndEachOnce() {
+        DeviceModel.Certification line = deviceModel("880d").certifications().get(0);
+        assertThatThrownBy(() -> new DeviceModel("x", "x", "x", List.of(), BigDecimal.ONE, Length.fromM(1), "II"))
+                .isInstanceOf(ConfigurationError.class);
+        assertThatThrownBy(() ->
+                        new DeviceModel("x", "x", "x", List.of(line, line), BigDecimal.ONE, Length.fromM(1), "II"))
+                .isInstanceOf(ConfigurationError.class);
     }
 }
