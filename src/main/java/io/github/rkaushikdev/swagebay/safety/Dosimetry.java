@@ -27,5 +27,25 @@ public final class Dosimetry {
     /** The share of the limit at which the second investigation level fires. */
     public static final BigDecimal INVESTIGATION_LEVEL_TWO = new BigDecimal("0.30");
 
+    /** The annual limit on the lens of the eye for an adult worker. */
+    public static final Dose LENS_LIMIT = Dose.fromMsv(150);
+
+    /** The annual limit on the skin and the extremities for an adult worker. */
+    public static final Dose SHALLOW_LIMIT = Dose.fromMsv(500);
+
+    /** The share of the adult limits a minor is held to, on every quantity. */
+    public static final BigDecimal MINOR_FRACTION = new BigDecimal("0.1");
+
     private Dosimetry() {}
+
+    /** Zero, one or two for a share of a limit, which is what the monthly report is keyed on. */
+    public static int investigationLevel(BigDecimal fraction) {
+        if (fraction.compareTo(INVESTIGATION_LEVEL_TWO) >= 0) {
+            return 2;
+        }
+        if (fraction.compareTo(INVESTIGATION_LEVEL_ONE) >= 0) {
+            return 1;
+        }
+        return 0;
+    }
 }

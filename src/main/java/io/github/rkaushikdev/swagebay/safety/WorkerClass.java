@@ -34,12 +34,27 @@ public enum WorkerClass {
         return value;
     }
 
-    /** The annual limit for this class. */
+    /** The annual limit for this class on the deep dose. */
     public Dose limit() {
+        return limit(DoseQuantity.DEEP);
+    }
+
+    /**
+     * The annual limit for this class on that quantity. A minor is held to a tenth of every adult
+     * limit. The declared pregnant limit is the embryo's and only the deep dose reaches it, so the
+     * worker's own lens and skin limits stay the adult ones.
+     */
+    public Dose limit(DoseQuantity quantity) {
+        Dose adult =
+                switch (quantity) {
+                    case DEEP -> Dosimetry.ANNUAL_LIMIT;
+                    case LENS -> Dosimetry.LENS_LIMIT;
+                    case SHALLOW -> Dosimetry.SHALLOW_LIMIT;
+                };
         return switch (this) {
-            case DECLARED_PREGNANT -> Dosimetry.DECLARED_PREGNANT_LIMIT;
-            case MINOR -> Dosimetry.MINOR_LIMIT;
-            case ADULT -> Dosimetry.ANNUAL_LIMIT;
+            case ADULT -> adult;
+            case MINOR -> quantity == DoseQuantity.DEEP ? Dosimetry.MINOR_LIMIT : adult.times(Dosimetry.MINOR_FRACTION);
+            case DECLARED_PREGNANT -> quantity == DoseQuantity.DEEP ? Dosimetry.DECLARED_PREGNANT_LIMIT : adult;
         };
     }
 

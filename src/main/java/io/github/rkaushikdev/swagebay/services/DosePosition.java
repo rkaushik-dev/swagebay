@@ -32,14 +32,7 @@ public record DosePosition(String badge, int year, Dose taken, Dose limit, Worke
 
     /** {@code 2} at or over the second investigation level, {@code 1} at or over the first, else {@code 0}. */
     public int investigationLevel() {
-        BigDecimal fraction = fraction();
-        if (fraction.compareTo(Dosimetry.INVESTIGATION_LEVEL_TWO) >= 0) {
-            return 2;
-        }
-        if (fraction.compareTo(Dosimetry.INVESTIGATION_LEVEL_ONE) >= 0) {
-            return 1;
-        }
-        return 0;
+        return Dosimetry.investigationLevel(fraction());
     }
 
     /** What is left of the limit, and nothing once it is reached. */
