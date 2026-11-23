@@ -1,5 +1,6 @@
 package io.github.rkaushikdev.swagebay.technique;
 
+import io.github.rkaushikdev.swagebay.ConfigurationError;
 import io.github.rkaushikdev.swagebay.Context;
 import io.github.rkaushikdev.swagebay.TechniqueError;
 import io.github.rkaushikdev.swagebay.exposure.Calculation;
@@ -20,6 +21,8 @@ import io.github.rkaushikdev.swagebay.imaging.Films;
 import io.github.rkaushikdev.swagebay.imaging.HoleSelection;
 import io.github.rkaushikdev.swagebay.imaging.Screens;
 import io.github.rkaushikdev.swagebay.imaging.Selection;
+import io.github.rkaushikdev.swagebay.materials.Material;
+import io.github.rkaushikdev.swagebay.materials.Materials;
 import io.github.rkaushikdev.swagebay.materials.Quality;
 import io.github.rkaushikdev.swagebay.quantities.Activity;
 import io.github.rkaushikdev.swagebay.quantities.Duration;
@@ -121,8 +124,8 @@ public final class Techniques {
 
         CoveragePlan coverage = coverageFor(joint, shot, geometry);
 
-        ExposureChart chart = Catalogue.chartFor(
-                isotope.key(), joint.material().key(), Films.REFERENCE_FILM.key(), request.density());
+        ChartReading reading = chartReading(isotope, joint.material(), request.density(), penetrated);
+        ExposureChart chart = reading.chart();
         CorrectionChain chain = new CorrectionChain()
                 .withCorrection(Corrections.distanceCorrection(chart.referenceSfd(), sfd))
                 .withCorrection(Corrections.filmCorrection(Films.REFERENCE_FILM, request.film()))
@@ -132,14 +135,64 @@ public final class Techniques {
             chain = chain.withCorrection(Corrections.collimatorCorrection(beamFraction(cup)));
         }
         Activity activity = request.source().activityAt(request.shotAt());
-        ExposureResult exposure = Calculation.planExposure(chart, penetrated, chain, activity, request.window());
+        ExposureResult exposure =
+                Calculation.planExposure(chart, reading.thickness(), chain, activity, request.window());
 
         Duration total = new Duration(Math.multiplyExact(exposure.exposure().ms(), coverage.exposures()));
         List<String> warnings = warnings(request, geometry, penetrated, exposure, total);
         warnings.addAll(screenFaults(request, isotope));
+        reading.note().ifPresent(warnings::add);
 
         return new TechniqueSheet(
                 joint, shot, penetrated, geometry, sfd, coverage, indicator, exposure, total, warnings);
+    }
+
+    /**
+     * The chart to read and the thickness to read it at.
+     *
+     * @param chart the chart
+     * @param thickness the thickness the chart is read at, steel equivalent when the chart is steel
+     *     and the weld is not
+     * @param note what the sheet says about a chart read for another material
+     */
+    public record ChartReading(ExposureChart chart, Length thickness, Optional<String> note) {}
+
+    /**
+     * The chart for the weld's own material where the shop has one, and otherwise the carbon steel
+     * chart read at the steel equivalent thickness through the ASTM E94 factor for the isotope.
+     *
+     * <p>That is what E94 is for, and it is how a stainless or a copper alloy job gets shot in a shop
+     * whose charts were all drawn on steel. The conversion is put on the sheet rather than hidden,
+     * because a Level III signing it wants to see the factor that was used.
+     *
+     * @throws io.github.rkaushikdev.swagebay.ConfigurationError when there is no chart for the
+     *     material and either no steel chart or no E94 column for the isotope
+     */
+    public static ChartReading chartReading(Isotope isotope, Material material, BigDecimal density, Length penetrated) {
+        String film = Films.REFERENCE_FILM.key();
+        Optional<ExposureChart> own = Catalogue.findChart(isotope.key(), material.key(), film, density);
+        if (own.isPresent()) {
+            return new ChartReading(own.get(), penetrated, Optional.empty());
+        }
+        Optional<ExposureChart> steel = Catalogue.findChart(isotope.key(), Materials.STEEL.key(), film, density);
+        if (steel.isEmpty() || isotope.equivalenceQuality().isEmpty()) {
+            throw new ConfigurationError(
+                    "no chart has been established for that combination",
+                    Context.of(
+                            "isotope", isotope.key(),
+                            "material", material.key(),
+                            "film", film,
+                            "density", density.toString()));
+        }
+        Quality quality = isotope.equivalenceQuality().get();
+        Length equivalent = material.steelEquivalent(penetrated, quality);
+        return new ChartReading(
+                steel.get(),
+                equivalent,
+                Optional.of(material + " read off the " + Materials.STEEL + " chart as " + equivalent.formatMm()
+                        + " of steel, factor "
+                        + Decimals.normalize(material.factorAt(quality)).toPlainString()
+                        + " at " + quality));
     }
 
     /**

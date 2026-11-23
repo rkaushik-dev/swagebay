@@ -6,6 +6,7 @@ import io.github.rkaushikdev.swagebay.ConfigurationError;
 import io.github.rkaushikdev.swagebay.Context;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The exposure charts this shop actually owns.
@@ -154,12 +155,7 @@ public final class Catalogue {
      * @throws ConfigurationError naming all four when no such chart has been established
      */
     public static ExposureChart chartFor(String isotopeKey, String materialKey, String filmKey, BigDecimal density) {
-        return CHARTS.stream()
-                .filter(candidate -> candidate.isotopeKey().equals(isotopeKey)
-                        && candidate.materialKey().equals(materialKey)
-                        && candidate.filmKey().equals(filmKey)
-                        && candidate.density().compareTo(density) == 0)
-                .findFirst()
+        return findChart(isotopeKey, materialKey, filmKey, density)
                 .orElseThrow(() -> new ConfigurationError(
                         "no chart has been established for that combination",
                         Context.of(
@@ -173,13 +169,21 @@ public final class Catalogue {
                                 density.toString())));
     }
 
+    /** The chart drawn for exactly that isotope, material, film and density, if the shop has one. */
+    public static Optional<ExposureChart> findChart(
+            String isotopeKey, String materialKey, String filmKey, BigDecimal density) {
+        return chartsForFilmSubstitution(isotopeKey, materialKey, density).stream()
+                .filter(candidate -> candidate.filmKey().equals(filmKey))
+                .findFirst();
+    }
+
     /** The charts that match everything but the film, so a speed factor can be applied to one. */
     public static List<ExposureChart> chartsForFilmSubstitution(
             String isotopeKey, String materialKey, BigDecimal density) {
         return CHARTS.stream()
-                .filter(candidate -> candidate.isotopeKey().equals(isotopeKey)
-                        && candidate.materialKey().equals(materialKey)
-                        && candidate.density().compareTo(density) == 0)
+                .filter(candidate -> candidate.isotopeKey().equals(isotopeKey))
+                .filter(candidate -> candidate.materialKey().equals(materialKey))
+                .filter(candidate -> candidate.density().compareTo(density) == 0)
                 .toList();
     }
 }
