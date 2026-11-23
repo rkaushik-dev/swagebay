@@ -66,6 +66,31 @@ class MaterialsTest {
     }
 
     @Test
+    void zincIsReadLikeBrassUnderIridium() {
+        Material zinc = Materials.material("zinc");
+        assertThat(zinc.factorAt(Quality.IR192)).isEqualByComparingTo("1.1");
+        assertThat(zinc.factorAt(Quality.CO60)).isEqualByComparingTo("1.0");
+        assertThat(zinc.steelEquivalent(mm(20), Quality.IR192)).isEqualTo(mm(22));
+        assertThat(zinc.densityKgM3()).isEqualTo(7140);
+        assertThat(zinc.isFerrous()).isFalse();
+        assertThatThrownBy(() -> zinc.factorAt(Quality.KV100)).isInstanceOf(ConfigurationError.class);
+        assertThatThrownBy(() -> zinc.factorAt(Quality.MV1)).isInstanceOf(ConfigurationError.class);
+    }
+
+    @Test
+    void everyRowHasAFactorWhereTheStandardPrintsOne() {
+        assertThat(Materials.COLUMNS).containsExactly(Quality.values());
+        assertThat(Materials.material("magnesium").factors()).hasSize(3);
+        assertThat(Materials.material("titanium").factors()).hasSize(8).doesNotContainKey(Quality.KV100);
+        assertThat(Materials.material("brass").factors()).doesNotContainKeys(Quality.KV100, Quality.MV4_25);
+        for (String key : List.of("carbon_steel", "stainless_304", "stainless_316", "inconel", "zirconium", "copper")) {
+            assertThat(Materials.material(key).factors()).as(key).hasSize(Quality.values().length);
+        }
+        assertThat(Materials.material("lead").factors()).doesNotContainKey(Quality.KV400);
+        assertThat(Materials.material("copper").factorAt(Quality.MV4_25)).isEqualByComparingTo("1.0");
+    }
+
+    @Test
     void inconelIsFlatAcrossTheWholeRange() {
         Material inconel = Materials.material("inconel");
         Set<BigDecimal> values = Stream.of(Quality.values())
@@ -102,7 +127,7 @@ class MaterialsTest {
         List<String> keys = Materials.knownMaterials();
         assertThat(keys).contains("carbon_steel");
         assertThat(keys).isSorted();
-        assertThat(keys).hasSize(12);
+        assertThat(keys).hasSize(13);
     }
 
     @Test
