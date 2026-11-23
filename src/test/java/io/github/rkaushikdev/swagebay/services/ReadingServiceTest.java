@@ -14,11 +14,13 @@ import io.github.rkaushikdev.swagebay.evaluation.Code;
 import io.github.rkaushikdev.swagebay.evaluation.Disposition;
 import io.github.rkaushikdev.swagebay.evaluation.Indication;
 import io.github.rkaushikdev.swagebay.evaluation.Kind;
+import io.github.rkaushikdev.swagebay.evaluation.SpotExamination;
 import io.github.rkaushikdev.swagebay.evaluation.Verdict;
 import io.github.rkaushikdev.swagebay.geometry.PipeSchedule;
 import io.github.rkaushikdev.swagebay.identity.JobNumber;
 import io.github.rkaushikdev.swagebay.materials.Materials;
 import io.github.rkaushikdev.swagebay.persistence.Database;
+import io.github.rkaushikdev.swagebay.persistence.UnitOfWork;
 import io.github.rkaushikdev.swagebay.persistence.models.RadiographRow;
 import io.github.rkaushikdev.swagebay.personnel.Level;
 import io.github.rkaushikdev.swagebay.personnel.Person;
@@ -203,5 +205,61 @@ class ReadingServiceTest {
         assertThat(ReadingService.readersAvailable(crew, READ.toLocalDate()))
                 .extracting(Person::badge)
                 .containsExactly("0142");
+    }
+
+    private static void read(UnitOfWork work, String number, Indication... found) {
+        ReadingService.recordReading(work, new ReadingRecord(number, aReader(), READ, List.of(found)));
+    }
+
+    @Test
+    void aSpotExaminedWeldIsFollowedThroughItsTracers() {
+        TestDatabase.fresh().transaction(work -> {
+            Prepared shot = ServiceFixtures.prepared(work, 4, true, Code.ASME_VIII_SPOT);
+            assertThat(ReadingService.spotStanding(work, shot.job(), WELD)).isEqualTo(new SpotExamination.NotShot());
+            read(work, shot.numbers().get(0), new Indication(Kind.IF, mm(100), mm(3)));
+            assertThat(ReadingService.spotStanding(work, shot.job(), WELD))
+                    .isEqualTo(new SpotExamination.TracersDue(2));
+            read(work, shot.numbers().get(1));
+            read(work, shot.numbers().get(2));
+            assertThat(ReadingService.spotStanding(work, shot.job(), WELD)).isEqualTo(new SpotExamination.RepairDue(0));
+            read(work, shot.numbers().get(3));
+            assertThat(ReadingService.spotStanding(work, shot.job(), WELD))
+                    .isEqualTo(new SpotExamination.Accepted(true));
+        });
+    }
+
+    @Test
+    void theWholeWeldOnASpotJobIsStillJudgedUnderUw52() {
+        TestDatabase.fresh().transaction(work -> {
+            Prepared shot = ServiceFixtures.prepared(work, 1, true, Code.ASME_VIII_SPOT);
+            read(work, shot.numbers().get(0), new Indication(Kind.IF, mm(100), mm(3)));
+            Verdict verdict = ReadingService.weldVerdict(work, shot.job(), WELD).orElseThrow();
+            assertThat(verdict.code()).isSameAs(Code.ASME_VIII_SPOT);
+            assertThat(verdict.clauses()).containsExactly("UW-52(c1)");
+        });
+    }
+
+    @Test
+    void onlyASpotJobHasASpotStanding() {
+        TestDatabase.fresh().transaction(work -> {
+            Prepared shot = prepared(work);
+            assertThatThrownBy(() -> ReadingService.spotStanding(work, shot.job(), WELD))
+                    .isInstanceOf(ValidationError.class);
+        });
+    }
+
+    @Test
+    void anUnreadFilmStillHoldsTheVerdictBackThroughTheRecord() {
+        TestDatabase.fresh().transaction(work -> {
+            Prepared shot = prepared(work, 3);
+            read(work, shot.numbers().get(0));
+            read(work, shot.numbers().get(2));
+            assertThat(ReadingService.weldVerdict(work, shot.job(), WELD)).isEmpty();
+            read(work, shot.numbers().get(1), new Indication(Kind.ESI, mm(100), mm(60), mm(1)));
+            assertThat(ReadingService.weldVerdict(work, shot.job(), WELD)
+                            .orElseThrow()
+                            .clauses())
+                    .containsExactly("9.3.8");
+        });
     }
 }

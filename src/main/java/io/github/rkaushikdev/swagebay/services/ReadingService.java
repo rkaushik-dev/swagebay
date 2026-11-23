@@ -4,9 +4,8 @@ import io.github.rkaushikdev.swagebay.ConflictError;
 import io.github.rkaushikdev.swagebay.Context;
 import io.github.rkaushikdev.swagebay.audit.Action;
 import io.github.rkaushikdev.swagebay.audit.Entry;
-import io.github.rkaushikdev.swagebay.evaluation.Acceptance;
 import io.github.rkaushikdev.swagebay.evaluation.Indication;
-import io.github.rkaushikdev.swagebay.evaluation.IndicationSet;
+import io.github.rkaushikdev.swagebay.evaluation.SpotExamination;
 import io.github.rkaushikdev.swagebay.evaluation.Verdict;
 import io.github.rkaushikdev.swagebay.identity.JobNumber;
 import io.github.rkaushikdev.swagebay.identity.WeldId;
@@ -17,6 +16,7 @@ import io.github.rkaushikdev.swagebay.persistence.models.JobRow;
 import io.github.rkaushikdev.swagebay.persistence.models.RadiographRow;
 import io.github.rkaushikdev.swagebay.persistence.models.WeldRow;
 import io.github.rkaushikdev.swagebay.personnel.Person;
+import io.github.rkaushikdev.swagebay.records.WeldRecord;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -197,29 +197,39 @@ public final class ReadingService {
 
     /**
      * The disposition of the weld under the job's code, or nothing while the weld has no films or
-     * any of them is unread or inadmissible.
+     * any of them is unread or inadmissible. The films are put on the weld's record and judged there,
+     * so the service and the record cannot disagree about when a weld is complete.
      *
      * @throws io.github.rkaushikdev.swagebay.NotFoundError for a job or a weld that is not there
      */
     public static Optional<Verdict> weldVerdict(UnitOfWork work, JobNumber job, WeldId weld) {
+        WeldRecord record = weldRecord(work, job, weld);
+        if (record.radiographs().isEmpty()) {
+            return Optional.empty();
+        }
+        return record.verdict(record.radiographs().size());
+    }
+
+    /**
+     * Where a weld on a spot examined job stands under UW-52(d): the spot, the two tracers it sets
+     * off when it fails, and the repair of the first.
+     *
+     * @throws io.github.rkaushikdev.swagebay.NotFoundError for a job or a weld that is not there
+     * @throws io.github.rkaushikdev.swagebay.ValidationError for a job that is not worked to spot
+     *     radiography
+     */
+    public static SpotExamination.Standing spotStanding(UnitOfWork work, JobNumber job, WeldId weld) {
+        return weldRecord(work, job, weld).spotStanding();
+    }
+
+    /** The weld and every film on it as the record the acceptance rules read. */
+    private static WeldRecord weldRecord(UnitOfWork work, JobNumber job, WeldId weld) {
         JobRow jobRow = work.jobs().get(job);
         WeldRow weldRow = work.welds().get(jobRow, weld);
-        List<RadiographRow> films = weldRow.getRadiographs();
-        if (films.isEmpty()) {
-            return Optional.empty();
-        }
-        if (films.stream()
-                .anyMatch(film -> !film.isAdmissible() || film.getReadAt().isEmpty())) {
-            return Optional.empty();
-        }
-        List<Indication> found = films.stream()
-                .flatMap(film -> film.getIndications().stream())
-                .map(WorkMapper::rowToIndication)
-                .toList();
-        return Optional.of(Acceptance.judge(
-                Naming.codeNamed(jobRow.getAcceptanceCode()),
-                new IndicationSet(weldRow.getWeldLength(), found),
-                weldRow.getWall()));
+        WeldRecord record = new WeldRecord(
+                job, weld, weldRow.getWeldLength(), weldRow.getWall(), Naming.codeNamed(jobRow.getAcceptanceCode()));
+        weldRow.getRadiographs().stream().map(WorkMapper::rowToRadiograph).forEach(record::add);
+        return record;
     }
 
     /**

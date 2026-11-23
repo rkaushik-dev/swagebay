@@ -68,7 +68,12 @@ public final class ServiceFixtures {
      *     admissible
      */
     public static Prepared prepared(UnitOfWork work, int shots, boolean visible) {
-        JobNumber job = JobService.openJob(work, new NewJob("c", "s", Code.API_1104, "RT-001", OPENED));
+        return prepared(work, shots, visible, Code.API_1104);
+    }
+
+    /** A job worked to that code with one weld and that many films shot on it. */
+    public static Prepared prepared(UnitOfWork work, int shots, boolean visible, Code code) {
+        JobNumber job = JobService.openJob(work, new NewJob("c", "s", code, "RT-001", OPENED));
         JobService.addWeld(
                 work,
                 job,
