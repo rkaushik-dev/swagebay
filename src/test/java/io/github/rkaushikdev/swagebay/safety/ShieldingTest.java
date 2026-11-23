@@ -12,6 +12,8 @@ import io.github.rkaushikdev.swagebay.ConfigurationError;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.quantities.DoseRate;
 import io.github.rkaushikdev.swagebay.quantities.Length;
+import io.github.rkaushikdev.swagebay.sources.Isotope;
+import io.github.rkaushikdev.swagebay.sources.Isotopes;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -148,5 +150,37 @@ class ShieldingTest {
     @Test
     void aBarrierPrintsTheWayASurveyNoteReads() {
         assertThat(new Barrier("lead", mm("4.8"))).hasToString("4.80 mm of lead");
+    }
+
+    @Test
+    void thuliumIsStoppedByAQuarterOfAMillimetreOfLead() {
+        Isotope thulium = Isotopes.isotope("tm170");
+        assertThat(Shielding.halfValueLayer(thulium, "lead")).isEqualTo(Length.fromMm("0.25"));
+        assertThat(Shielding.halfValueLayer(thulium, "steel")).isEqualTo(Length.fromMm("2.5"));
+        assertThat(Shielding.materialsFor(thulium)).isEqualTo(Shielding.SHIELD_MATERIALS);
+        for (String material : Shielding.SHIELD_MATERIALS) {
+            assertThat(Shielding.halfValueLayer(thulium, material))
+                    .as(material)
+                    .isLessThanOrEqualTo(Shielding.halfValueLayer(Isotopes.isotope("yb169"), material));
+        }
+    }
+
+    @Test
+    void everyRowReadsBackUnderTheRightColumn() {
+        assertThat(Shielding.halfValueLayer(IR192, "lead")).isEqualTo(Length.fromMm("4.8"));
+        assertThat(Shielding.halfValueLayer(IR192, "concrete")).isEqualTo(Length.fromMm("44.5"));
+        assertThat(Shielding.halfValueLayer(IR192, "water")).isEqualTo(Length.fromMm(160));
+        assertThat(Shielding.halfValueLayer(Isotopes.CO60, "tungsten")).isEqualTo(Length.fromMm("7.6"));
+        assertThat(Shielding.halfValueLayer(Isotopes.isotope("cs137"), "uranium"))
+                .isEqualTo(Length.fromMm(3));
+        assertThat(Shielding.halfValueLayer(Isotopes.SE75, "steel")).isEqualTo(Length.fromMm(8));
+    }
+
+    @Test
+    void aThuliumBarrierCutsTheRateTheSameWayAsAnyOther() {
+        Isotope thulium = Isotopes.isotope("tm170");
+        Barrier sheet = new Barrier("lead", Length.fromMm("0.5"));
+        assertThat(sheet.layers(thulium)).isEqualByComparingTo("2");
+        assertThat(sheet.transmission(thulium)).isEqualByComparingTo("0.25");
     }
 }
