@@ -150,48 +150,59 @@ public final class AsmeUw51 {
 
     /**
      * Every UW-51 objection to a set of indications at that wall: cracks under b1, planar
-     * indications over the sliding limit under b2, and aligned groups over the wall under b3.
+     * indications over the sliding limit under b2, aligned groups over the wall under b3, and
+     * rounded indications over the Appendix 4 limits under b4.
      *
      * @throws ValidationError for a wall that is not positive
      */
     public static List<Uw51Finding> evaluate(List<Indication> indications, Length wall) {
-        List<Uw51Finding> out = new ArrayList<>();
-        for (Indication indication : indications) {
-            if (indication.kind().isAlwaysRejectable()) {
-                out.add(new Uw51Finding("b1", "a crack is not acceptable at any length", List.of(indication)));
-            }
-        }
+        Length limit = elongatedLimit(wall);
         List<Indication> planar = indications.stream()
                 .filter(indication -> indication.kind().isPlanar())
                 .toList();
-        Length limit = elongatedLimit(wall);
-        for (Indication indication : planar) {
-            if (indication.kind().isAlwaysRejectable()) {
-                continue;
-            }
-            if (indication.length().compareTo(limit) > 0) {
-                out.add(new Uw51Finding(
+        List<Uw51Finding> out = new ArrayList<>(cracks(indications));
+        out.addAll(overTheSlidingLimit(planar, limit, wall));
+        out.addAll(alignedOverTheWall(planar, wall));
+        out.addAll(RoundedIndications.evaluate(indications, wall));
+        return List.copyOf(out);
+    }
+
+    /** b1: every crack, whatever its length. */
+    private static List<Uw51Finding> cracks(List<Indication> indications) {
+        return indications.stream()
+                .filter(indication -> indication.kind().isAlwaysRejectable())
+                .map(indication ->
+                        new Uw51Finding("b1", "a crack is not acceptable at any length", List.of(indication)))
+                .toList();
+    }
+
+    /** b2: planar indications other than cracks longer than the limit at that wall. */
+    private static List<Uw51Finding> overTheSlidingLimit(List<Indication> planar, Length limit, Length wall) {
+        return planar.stream()
+                .filter(indication -> !indication.kind().isAlwaysRejectable())
+                .filter(indication -> indication.length().compareTo(limit) > 0)
+                .map(indication -> new Uw51Finding(
                         "b2",
                         indication.length().formatMm(1) + " is over the " + limit.formatMm(1) + " allowed at "
                                 + wall.formatMm(1) + " wall",
-                        List.of(indication)));
-            }
-        }
+                        List.of(indication)))
+                .toList();
+    }
+
+    /** b3: aligned groups of two or more inside the window whose lengths total more than the wall. */
+    private static List<Uw51Finding> alignedOverTheWall(List<Indication> planar, Length wall) {
         Length window = windowFor(wall);
-        for (Group group : groupAligned(planar)) {
-            if (group.size() < 2) {
-                continue;
-            }
-            if (group.span().compareTo(window) <= 0 && group.aggregate().compareTo(wall) > 0) {
-                out.add(new Uw51Finding(
+        return groupAligned(planar).stream()
+                .filter(group -> group.size() >= 2)
+                .filter(group -> group.span().compareTo(window) <= 0)
+                .filter(group -> group.aggregate().compareTo(wall) > 0)
+                .map(group -> new Uw51Finding(
                         "b3",
                         group.size() + " aligned indications total "
                                 + group.aggregate().formatMm(1) + " in " + window.formatMm(1) + ", over the "
                                 + wall.formatMm(1) + " allowed",
-                        group.members()));
-            }
-        }
-        return List.copyOf(out);
+                        group.members()))
+                .toList();
     }
 
     /** Whether the three part limit joins up at both ends, to the micrometre. */
