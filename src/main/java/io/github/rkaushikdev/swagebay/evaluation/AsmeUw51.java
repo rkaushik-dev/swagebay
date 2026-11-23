@@ -126,20 +126,29 @@ public final class AsmeUw51 {
      * pulls more of its neighbours in with it.
      */
     public static List<Group> groupAligned(List<Indication> indications) {
+        return groupAligned(indications, GROUP_GAP_MULTIPLE, false);
+    }
+
+    /**
+     * Break a run of indications wherever the gap exceeds that multiple of the longest so far, or
+     * reaches it when a gap of exactly that much is enough to keep two apart.
+     */
+    static List<Group> groupAligned(List<Indication> indications, int multiple, boolean breakOnEqual) {
         List<Indication> ordered = indications.stream()
                 .sorted(Comparator.comparingLong(
                         indication -> indication.startsAt().um()))
                 .toList();
-        if (ordered.isEmpty()) {
-            return List.of();
-        }
         List<List<Indication>> groups = new ArrayList<>();
-        groups.add(new ArrayList<>(List.of(ordered.get(0))));
-        for (Indication indication : ordered.subList(1, ordered.size())) {
-            List<Indication> current = groups.get(groups.size() - 1);
-            Length longest = longestOf(current);
-            Length gap = current.get(current.size() - 1).gapTo(indication);
-            if (gap.compareTo(longest.times(GROUP_GAP_MULTIPLE)) > 0) {
+        for (Indication indication : ordered) {
+            List<Indication> current = groups.isEmpty() ? List.of() : groups.get(groups.size() - 1);
+            if (current.isEmpty()) {
+                groups.add(new ArrayList<>(List.of(indication)));
+                continue;
+            }
+            int against = current.get(current.size() - 1)
+                    .gapTo(indication)
+                    .compareTo(longestOf(current).times(multiple));
+            if (against > 0 || (breakOnEqual && against == 0)) {
                 groups.add(new ArrayList<>(List.of(indication)));
             } else {
                 current.add(indication);
