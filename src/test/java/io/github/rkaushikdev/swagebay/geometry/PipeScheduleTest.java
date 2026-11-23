@@ -84,6 +84,58 @@ class PipeScheduleTest {
     }
 
     @Test
+    void theStainlessSchedulesAreTheirOwnWalls() {
+        assertThat(PipeSchedule.wall("2", "10S")).isEqualTo(mm("2.77"));
+        assertThat(PipeSchedule.wall("2", "5s")).isEqualTo(mm("1.65"));
+        assertThat(PipeSchedule.wall("6", "40S")).isEqualTo(PipeSchedule.wall("6", "40"));
+        assertThat(PipeSchedule.wall("12", "40S")).isEqualTo(mm("9.53"));
+        assertThat(PipeSchedule.wall("12", "40S")).isNotEqualTo(PipeSchedule.wall("12", "40"));
+        assertThat(PipeSchedule.wall("24", "10S")).isEqualTo(mm("6.35"));
+        assertThatThrownBy(() -> PipeSchedule.wall("2", "10")).isInstanceOf(ConfigurationError.class);
+        assertThatThrownBy(() -> PipeSchedule.wall("14", "40S")).isInstanceOf(ConfigurationError.class);
+    }
+
+    @Test
+    void theIntermediateCarbonSteelSchedulesAreCarried() {
+        assertThat(PipeSchedule.wall("8", "20")).isEqualTo(mm("6.35"));
+        assertThat(PipeSchedule.wall("10", "30")).isEqualTo(mm("7.80"));
+        assertThat(PipeSchedule.wall("12", "60")).isEqualTo(mm("14.27"));
+        assertThat(PipeSchedule.wall("16", "100")).isEqualTo(mm("26.19"));
+        assertThat(PipeSchedule.wall("6", "120")).isEqualTo(mm("14.27"));
+        assertThat(PipeSchedule.wall("20", "140")).isEqualTo(mm("44.45"));
+        assertThat(PipeSchedule.wall("14", "10")).isEqualTo(mm("6.35"));
+        assertThatThrownBy(() -> PipeSchedule.wall("6", "140")).isInstanceOf(ConfigurationError.class);
+    }
+
+    @Test
+    void everySizeGetsHeavierAlongTheNumberedSchedules() {
+        List<String> numbered = List.of("10", "20", "30", "40", "60", "80", "100", "120", "140", "160");
+        for (String nominal : PipeSchedule.nominalSizes()) {
+            List<Length> walls = numbered.stream()
+                    .filter(schedule -> isPublished(nominal, schedule))
+                    .map(schedule -> PipeSchedule.wall(nominal, schedule))
+                    .toList();
+            assertThat(walls).as(nominal).isSorted().doesNotHaveDuplicates();
+            assertThat(walls).as(nominal).hasSizeGreaterThanOrEqualTo(3);
+        }
+    }
+
+    @Test
+    void theColumnsAreTheOnesThePrintedTableCarries() {
+        assertThat(PipeSchedule.SCHEDULES).hasSize(17).startsWith("5S", "10S").endsWith("160", "XXS");
+        assertThat(PipeSchedule.resolve("3", "80s")).hasToString("NPS 3 sch 80S");
+    }
+
+    private static boolean isPublished(String nominal, String schedule) {
+        try {
+            PipeSchedule.wall(nominal, schedule);
+            return true;
+        } catch (ConfigurationError notPublished) {
+            return false;
+        }
+    }
+
+    @Test
     void aLineListLineBecomesAJoint() {
         Joint joint = PipeSchedule.girthWeld("6", "40", STEEL, mm("2.0"));
         assertThat(joint.form()).isSameAs(JointForm.PIPE_GIRTH);

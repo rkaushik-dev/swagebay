@@ -13,7 +13,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Nominal pipe size and wall schedule, from ASME B36.10M.
+ * Nominal pipe size and wall schedule, from ASME B36.10M and B36.19M.
  *
  * <p>A work order says six inch schedule forty. It does not say 168.3 mm outside diameter and 7.11
  * mm wall, and the shooter is not going to look it up on a phone at four in the morning in a lay
@@ -24,43 +24,52 @@ import java.util.Map;
  * given nominal size no matter what the schedule is, which is the whole point of the schedule
  * system, so a heavier wall eats the bore rather than growing the pipe.
  *
- * <p>Only the schedules the shop actually meets are in here. A line list that asks for something
- * else gets a refusal and somebody enters the wall by hand, which is better than a wall that was
- * interpolated out of nowhere.
+ * <p>The stainless schedules with an S after them are ASME B36.19M and they are not the same walls
+ * as the carbon steel numbers without one: ten S on a two inch line is 2.77 mm, and schedule ten is
+ * not published there at all. A line list that asks for something the table does not carry gets a
+ * refusal and somebody enters the wall by hand, which is better than a wall that was interpolated
+ * out of nowhere.
  */
 public final class PipeSchedule {
 
-    /** The schedules the table carries. */
-    public static final List<String> SCHEDULES = List.of("STD", "XS", "XXS", "40", "80", "160");
+    /** The schedules the table carries, in the order the columns are printed. */
+    public static final List<String> SCHEDULES = List.of(
+            "5S", "10S", "10", "20", "30", "40S", "STD", "40", "60", "80S", "XS", "80", "100", "120", "140", "160",
+            "XXS");
 
     private static final BigDecimal DEFAULT_TOLERANCE = new BigDecimal("0.03");
 
-    /** Nominal size to its outside diameter in millimetres and its wall in millimetres by schedule. */
-    private static final Map<String, Row> TABLE = new LinkedHashMap<>();
+    private static final String NOT_PUBLISHED = "-";
 
-    private record Row(String outsideDiameterMm, Map<String, String> wallsMm) {}
+    /**
+     * The table as the standards print it: nominal size, outside diameter, then a wall in
+     * millimetres for every schedule in {@link #SCHEDULES}, a dash where none is published.
+     */
+    private static final List<String> GRID = List.of(
+            "1/2    21.3  1.65 2.11 -    -    -     2.77 2.77 2.77  -     3.73  3.73  3.73  -     -     -     4.78  7.47",
+            "3/4    26.7  1.65 2.11 -    -    -     2.87 2.87 2.87  -     3.91  3.91  3.91  -     -     -     5.56  7.82",
+            "1      33.4  1.65 2.77 -    -    -     3.38 3.38 3.38  -     4.55  4.55  4.55  -     -     -     6.35  9.09",
+            "1-1/4  42.2  1.65 2.77 -    -    -     3.56 3.56 3.56  -     4.85  4.85  4.85  -     -     -     6.35  9.70",
+            "1-1/2  48.3  1.65 2.77 -    -    -     3.68 3.68 3.68  -     5.08  5.08  5.08  -     -     -     7.14  10.15",
+            "2      60.3  1.65 2.77 -    -    -     3.91 3.91 3.91  -     5.54  5.54  5.54  -     -     -     8.74  11.07",
+            "2-1/2  73.0  2.11 3.05 -    -    -     5.16 5.16 5.16  -     7.01  7.01  7.01  -     -     -     9.53  14.02",
+            "3      88.9  2.11 3.05 -    -    -     5.49 5.49 5.49  -     7.62  7.62  7.62  -     -     -     11.13 15.24",
+            "4      114.3 2.11 3.05 -    -    -     6.02 6.02 6.02  -     8.56  8.56  8.56  -     11.13 -     13.49 17.12",
+            "5      141.3 2.77 3.40 -    -    -     6.55 6.55 6.55  -     9.53  9.53  9.53  -     12.70 -     15.88 19.05",
+            "6      168.3 2.77 3.40 -    -    -     7.11 7.11 7.11  -     10.97 10.97 10.97 -     14.27 -     18.26 21.95",
+            "8      219.1 2.77 3.76 -    6.35 7.04  8.18 8.18 8.18  10.31 12.70 12.70 12.70 15.09 18.26 20.62 23.01 22.23",
+            "10     273.0 3.40 4.19 -    6.35 7.80  9.27 9.27 9.27  12.70 12.70 12.70 15.09 18.26 21.44 25.40 28.58 25.40",
+            "12     323.8 3.96 4.57 -    6.35 8.38  9.53 9.53 10.31 14.27 12.70 12.70 17.48 21.44 25.40 28.58 33.32 25.40",
+            "14     355.6 3.96 4.78 6.35 7.92 9.53  -    9.53 11.13 15.09 -     12.70 19.05 23.83 27.79 31.75 35.71 -",
+            "16     406.4 4.19 4.78 6.35 7.92 9.53  -    9.53 12.70 16.66 -     12.70 21.44 26.19 30.96 36.53 40.49 -",
+            "18     457.2 4.19 4.78 6.35 7.92 11.13 -    9.53 14.27 19.05 -     12.70 23.83 29.36 34.93 39.67 45.24 -",
+            "20     508.0 4.78 5.54 6.35 9.53 12.70 -    9.53 15.09 20.62 -     12.70 26.19 32.54 38.10 44.45 50.01 -",
+            "24     609.6 5.54 6.35 6.35 9.53 14.27 -    9.53 17.48 24.61 -     12.70 30.96 38.89 46.02 52.37 59.54 -");
 
-    static {
-        publish("1/2", "21.3", "2.77", "3.73", "7.47", "2.77", "3.73", "4.78");
-        publish("3/4", "26.7", "2.87", "3.91", "7.82", "2.87", "3.91", "5.56");
-        publish("1", "33.4", "3.38", "4.55", "9.09", "3.38", "4.55", "6.35");
-        publish("1-1/4", "42.2", "3.56", "4.85", "9.70", "3.56", "4.85", "6.35");
-        publish("1-1/2", "48.3", "3.68", "5.08", "10.15", "3.68", "5.08", "7.14");
-        publish("2", "60.3", "3.91", "5.54", "11.07", "3.91", "5.54", "8.74");
-        publish("2-1/2", "73.0", "5.16", "7.01", "14.02", "5.16", "7.01", "9.53");
-        publish("3", "88.9", "5.49", "7.62", "15.24", "5.49", "7.62", "11.13");
-        publish("4", "114.3", "6.02", "8.56", "17.12", "6.02", "8.56", "13.49");
-        publish("5", "141.3", "6.55", "9.53", "19.05", "6.55", "9.53", "15.88");
-        publish("6", "168.3", "7.11", "10.97", "21.95", "7.11", "10.97", "18.26");
-        publish("8", "219.1", "8.18", "12.70", "22.23", "8.18", "12.70", "23.01");
-        publish("10", "273.0", "9.27", "12.70", "25.40", "9.27", "15.09", "28.58");
-        publish("12", "323.8", "9.53", "12.70", "25.40", "10.31", "17.48", "33.32");
-        publishWithoutDoubleExtraStrong("14", "355.6", "9.53", "12.70", "11.13", "19.05", "35.71");
-        publishWithoutDoubleExtraStrong("16", "406.4", "9.53", "12.70", "12.70", "21.44", "40.49");
-        publishWithoutDoubleExtraStrong("18", "457.2", "9.53", "12.70", "14.27", "23.83", "45.24");
-        publishWithoutDoubleExtraStrong("20", "508.0", "9.53", "12.70", "15.09", "26.19", "50.01");
-        publishWithoutDoubleExtraStrong("24", "609.6", "9.53", "12.70", "17.48", "30.96", "59.54");
-    }
+    /** Nominal size to its outside diameter and its wall by schedule. */
+    private static final Map<String, Row> TABLE = parse(GRID);
+
+    private record Row(Length outsideDiameter, Map<String, Length> walls) {}
 
     private PipeSchedule() {}
 
@@ -75,7 +84,7 @@ public final class PipeSchedule {
      * @throws ConfigurationError for a size the table does not carry
      */
     public static Length outsideDiameter(String nominal) {
-        return Length.fromMm(row(nominal).outsideDiameterMm());
+        return row(nominal).outsideDiameter();
     }
 
     /**
@@ -85,13 +94,13 @@ public final class PipeSchedule {
      *     that size
      */
     public static Length wall(String nominal, String schedule) {
-        String wall = row(nominal).wallsMm().get(schedule.toUpperCase(Locale.ROOT));
+        Length wall = row(nominal).walls().get(schedule.toUpperCase(Locale.ROOT));
         if (wall == null) {
             throw new ConfigurationError(
                     "that schedule is not published at this size",
                     Context.of("nominal", nominal, "schedule", schedule));
         }
-        return Length.fromMm(wall);
+        return wall;
     }
 
     /** The size and schedule resolved to their diameter and wall. */
@@ -129,7 +138,7 @@ public final class PipeSchedule {
         BigDecimal bestError = null;
         String bestNominal = null;
         for (Map.Entry<String, Row> entry : TABLE.entrySet()) {
-            Length published = Length.fromMm(entry.getValue().outsideDiameterMm());
+            Length published = entry.getValue().outsideDiameter();
             BigDecimal error = Decimals.divide(
                             BigDecimal.valueOf(measured.um() - published.um()), BigDecimal.valueOf(published.um()))
                     .abs();
@@ -154,27 +163,24 @@ public final class PipeSchedule {
         return row;
     }
 
-    private static void publish(
-            String nominal, String od, String std, String xs, String xxs, String s40, String s80, String s160) {
-        Map<String, String> walls = new LinkedHashMap<>();
-        walls.put("STD", std);
-        walls.put("XS", xs);
-        walls.put("XXS", xxs);
-        walls.put("40", s40);
-        walls.put("80", s80);
-        walls.put("160", s160);
-        TABLE.put(nominal, new Row(od, Collections.unmodifiableMap(walls)));
-    }
-
-    /** The sizes from fourteen inch up, where double extra strong is not published. */
-    private static void publishWithoutDoubleExtraStrong(
-            String nominal, String od, String std, String xs, String s40, String s80, String s160) {
-        Map<String, String> walls = new LinkedHashMap<>();
-        walls.put("STD", std);
-        walls.put("XS", xs);
-        walls.put("40", s40);
-        walls.put("80", s80);
-        walls.put("160", s160);
-        TABLE.put(nominal, new Row(od, Collections.unmodifiableMap(walls)));
+    /** Read the printed grid into rows, refusing a line with the wrong number of columns. */
+    private static Map<String, Row> parse(List<String> grid) {
+        Map<String, Row> table = new LinkedHashMap<>();
+        for (String line : grid) {
+            String[] cells = line.trim().split("\\s+");
+            if (cells.length != SCHEDULES.size() + 2) {
+                throw new ConfigurationError(
+                        "a pipe schedule row has the wrong number of columns", Context.of("row", cells[0]));
+            }
+            Map<String, Length> walls = new LinkedHashMap<>();
+            for (int i = 0; i < SCHEDULES.size(); i++) {
+                String cell = cells[i + 2];
+                if (!cell.equals(NOT_PUBLISHED)) {
+                    walls.put(SCHEDULES.get(i), Length.fromMm(cell));
+                }
+            }
+            table.put(cells[0], new Row(Length.fromMm(cells[1]), Collections.unmodifiableMap(walls)));
+        }
+        return Collections.unmodifiableMap(table);
     }
 }
