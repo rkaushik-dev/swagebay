@@ -23,10 +23,11 @@ public final class Tubes {
     private static final Map<String, Tube> TUBES = new LinkedHashMap<>();
 
     static {
-        add("eresco42", "ERESCO 42 MF4", "Waygate", 10, 200, "10", "1.0", "0.5");
-        add("eresco65", "ERESCO 65 MF4", "Waygate", 15, 300, "10", "3.0", "0.5");
-        add("xrs3", "XRS-3", "Golden", 270, 270, "0.1", "3.0", "0.2");
-        add("mg452", "MG452", "Comet", 20, 450, "15", "5.5", "1.0");
+        tube("eresco42", "ERESCO 42 MF4", "Waygate", "10   200  10   1.0  0.5");
+        tube("eresco52", "ERESCO 52 MF4", "Waygate", "10   250  10   1.0  0.5");
+        tube("eresco65", "ERESCO 65 MF4", "Waygate", "15   300  10   3.0  0.5");
+        tube("xrs3", "XRS-3", "Golden", "270  270  0.1  3.0  0.2");
+        tube("mg452", "MG452", "Comet", "20   450  15   5.5  1.0");
     }
 
     private Tubes() {}
@@ -84,25 +85,27 @@ public final class Tubes {
                 .toList();
     }
 
-    private static void add(
-            String key,
-            String name,
-            String manufacturer,
-            int minKv,
-            int maxKv,
-            String maxMa,
-            String focalSpotMm,
-            String dutyCycle) {
+    /**
+     * One set as its certificate reads: the lowest and highest kilovoltage, the most current in
+     * milliamperes, the focal spot in millimetres and the duty cycle.
+     *
+     * @throws ConfigurationError for a row without all five numbers
+     */
+    private static void tube(String key, String name, String manufacturer, String certificate) {
+        String[] cells = certificate.trim().split("\\s+");
+        if (cells.length != 5) {
+            throw new ConfigurationError("an x-ray set row has the wrong number of columns", Context.of("key", key));
+        }
         TUBES.put(
                 key,
                 new Tube(
                         key,
                         name,
                         manufacturer,
-                        minKv,
-                        maxKv,
-                        new BigDecimal(maxMa),
-                        Length.fromMm(focalSpotMm),
-                        new BigDecimal(dutyCycle)));
+                        Integer.parseInt(cells[0]),
+                        Integer.parseInt(cells[1]),
+                        new BigDecimal(cells[2]),
+                        Length.fromMm(cells[3]),
+                        new BigDecimal(cells[4])));
     }
 }

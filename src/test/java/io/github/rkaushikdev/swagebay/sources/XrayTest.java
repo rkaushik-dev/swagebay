@@ -134,7 +134,9 @@ class XrayTest {
 
     @Test
     void theSetsThatReachAKilovoltageComeBackFinestSpotFirst() {
-        assertThat(tubesReaching(150)).extracting(Tube::key).containsExactly("eresco42", "eresco65", "mg452");
+        assertThat(tubesReaching(150))
+                .extracting(Tube::key)
+                .containsExactly("eresco42", "eresco52", "eresco65", "mg452");
         assertThat(tubesReaching(500)).isEmpty();
     }
 
@@ -154,12 +156,33 @@ class XrayTest {
 
     @Test
     void theCatalogueIsClosed() {
-        assertThat(Tubes.knownTubes()).containsExactly("eresco42", "eresco65", "mg452", "xrs3");
+        assertThat(Tubes.knownTubes()).containsExactly("eresco42", "eresco52", "eresco65", "mg452", "xrs3");
         assertThatThrownBy(() -> tube("eresco99")).isInstanceOf(ConfigurationError.class);
         assertThat(tube("eresco42")).hasToString("ERESCO 42 MF4 10 to 200 kV");
     }
 
     private static Tube build(int minKv, int maxKv, BigDecimal maxMa, Length focalSpot, BigDecimal dutyCycle) {
         return new Tube("x", "x", "x", minKv, maxKv, maxMa, focalSpot, dutyCycle);
+    }
+
+    @Test
+    void theFiftyTwoFillsTheGapBetweenTheFortyTwoAndTheSixtyFive() {
+        Tube middle = tube("eresco52");
+        assertThat(middle.canReach(250)).isTrue();
+        assertThat(middle.canReach(251)).isFalse();
+        assertThat(middle.focalSpot()).isEqualTo(tube("eresco42").focalSpot());
+        assertThat(middle).hasToString("ERESCO 52 MF4 10 to 250 kV");
+        assertThat(tubesReaching(250)).extracting(Tube::key).containsExactly("eresco52", "eresco65", "mg452");
+    }
+
+    @Test
+    void everySetReadsBackItsCertificate() {
+        Tube portable = tube("xrs3");
+        assertThat(portable.minKv()).isEqualTo(270);
+        assertThat(portable.maxKv()).isEqualTo(270);
+        assertThat(portable.maxMa()).isEqualByComparingTo("0.1");
+        assertThat(portable.dutyCycle()).isEqualByComparingTo("0.2");
+        assertThat(tube("mg452").focalSpot()).isEqualTo(Length.fromMm("5.5"));
+        assertThat(tube("mg452").manufacturer()).isEqualTo("Comet");
     }
 }

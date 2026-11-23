@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.rkaushikdev.swagebay.TechniqueError;
 import io.github.rkaushikdev.swagebay.ValidationError;
+import io.github.rkaushikdev.swagebay.materials.Quality;
 import io.github.rkaushikdev.swagebay.quantities.Length;
 import java.math.BigDecimal;
 import java.util.List;
@@ -145,5 +146,16 @@ class KilovoltageTest {
         assertThat(bands).extracting(Kilovoltage.Band::ceiling).isSorted();
         assertThat(bands).extracting(Kilovoltage.Band::kv).isSorted();
         assertThat(bands).hasSize(11);
+    }
+
+    @Test
+    void theChoiceNamesTheColumnAMaterialIsReadOn() {
+        KilovoltageChoice picked = choose(mm(13), tube("eresco42"));
+        assertThat(picked.quality()).isSameAs(Quality.KV150);
+        assertThat(new KilovoltageChoice(200, 180, List.of("density")).quality())
+                .isSameAs(Quality.KV220);
+        assertThat(new KilovoltageChoice(320, 320, List.of()).quality()).isSameAs(Quality.KV400);
+        assertThatThrownBy(() -> new KilovoltageChoice(0, 0, List.of()).quality())
+                .isInstanceOf(TechniqueError.class);
     }
 }

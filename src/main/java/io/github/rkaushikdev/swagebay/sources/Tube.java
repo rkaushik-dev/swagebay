@@ -106,19 +106,9 @@ public record Tube(
      */
     public Quality qualityAt(int kv) {
         checkKv(kv);
-        if (kv <= 100) {
-            return Quality.KV100;
-        }
-        if (kv <= 150) {
-            return Quality.KV150;
-        }
-        if (kv <= 220) {
-            return Quality.KV220;
-        }
-        if (kv <= 400) {
-            return Quality.KV400;
-        }
-        return Quality.MV1;
+        return Quality.forKilovoltage(kv)
+                .orElseThrow(() -> new TechniqueError(
+                        "no equivalence column covers that kilovoltage", Context.of("tube", key, "kv", kv)));
     }
 
     /** The name and the range: {@code ERESCO 42 MF4 10 to 200 kV}. */

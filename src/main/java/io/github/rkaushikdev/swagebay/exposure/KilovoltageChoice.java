@@ -1,5 +1,8 @@
 package io.github.rkaushikdev.swagebay.exposure;
 
+import io.github.rkaushikdev.swagebay.Context;
+import io.github.rkaushikdev.swagebay.TechniqueError;
+import io.github.rkaushikdev.swagebay.materials.Quality;
 import java.util.List;
 
 /**
@@ -19,6 +22,17 @@ public record KilovoltageChoice(int kv, int fromTable, List<String> reasons) {
     /** Whether the choice is the table value. */
     public boolean isTableValue() {
         return kv == fromTable;
+    }
+
+    /**
+     * The equivalence column a shot at this kilovoltage reads a material on.
+     *
+     * @throws TechniqueError for a kilovoltage no column covers
+     */
+    public Quality quality() {
+        return Quality.forKilovoltage(kv)
+                .orElseThrow(() ->
+                        new TechniqueError("no equivalence column covers that kilovoltage", Context.of("kv", kv)));
     }
 
     /** How many whole contrast steps the choice sits above the table value. */
