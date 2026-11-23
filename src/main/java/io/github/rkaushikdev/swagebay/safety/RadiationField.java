@@ -1,8 +1,10 @@
 package io.github.rkaushikdev.swagebay.safety;
 
+import io.github.rkaushikdev.swagebay.Context;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.quantities.Activity;
 import io.github.rkaushikdev.swagebay.quantities.DoseRate;
+import io.github.rkaushikdev.swagebay.quantities.Duration;
 import io.github.rkaushikdev.swagebay.quantities.Length;
 import io.github.rkaushikdev.swagebay.sources.Collimator;
 import io.github.rkaushikdev.swagebay.sources.Isotope;
@@ -69,10 +71,7 @@ public record RadiationField(
 
     /** Everything between the source and that bearing, multiplied together: the collimator, then each barrier. */
     public BigDecimal attenuation(BigDecimal bearingDegrees) {
-        BigDecimal total = BigDecimal.ONE;
-        if (collimator.isPresent()) {
-            total = Decimals.multiply(total, collimator.get().factorAt(bearingDegrees));
-        }
+        BigDecimal total = collimator.map(cup -> cup.factorAt(bearingDegrees)).orElse(BigDecimal.ONE);
         for (Barrier barrier : barriers) {
             total = Decimals.multiply(total, barrier.transmission(isotope));
         }
@@ -89,9 +88,8 @@ public record RadiationField(
             throw new ValidationError("a rate needs a distance from the source");
         }
         BigDecimal metres = distance.m();
-        BigDecimal unshielded = Decimals.divide(
-                BigDecimal.valueOf(unshieldedAtOneMetre().nsvPerHour()), Decimals.multiply(metres, metres));
-        return new DoseRate(Decimals.truncate(Decimals.multiply(unshielded, attenuation(bearingDegrees))));
+        return new DoseRate(
+                Decimals.truncate(Decimals.divide(atOneMetre(bearingDegrees), Decimals.multiply(metres, metres))));
     }
 
     /**
@@ -104,13 +102,31 @@ public record RadiationField(
         if (target.nsvPerHour() <= 0) {
             throw new ValidationError("a boundary needs a positive rate");
         }
-        BigDecimal attenuated =
-                Decimals.multiply(BigDecimal.valueOf(unshieldedAtOneMetre().nsvPerHour()), attenuation(bearingDegrees));
+        BigDecimal attenuated = atOneMetre(bearingDegrees);
         if (attenuated.signum() <= 0) {
             return Length.ZERO;
         }
-        BigDecimal metres = Decimals.sqrt(Decimals.divide(attenuated, BigDecimal.valueOf(target.nsvPerHour())));
-        return new Length(Decimals.ceiling(Decimals.multiply(metres, UM_PER_M)));
+        return outTo(UM_PER_M, Decimals.divide(attenuated, BigDecimal.valueOf(target.nsvPerHour())));
+    }
+
+    /**
+     * How far back the public boundary is drawn along the bearing when the source is only out part
+     * of any hour, always rounded away from the source.
+     *
+     * <p>The public limit is not a rate. It is two millirem in any one hour, so a source that is out
+     * for six minutes in the hour may be roped at the distance where the rate is twenty millirem an
+     * hour, which is the square root of ten times closer. The busiest hour of the shift is the one
+     * that counts, and a source out for the whole hour gets the ordinary restricted area boundary.
+     *
+     * @throws ValidationError for a time out that is not positive or is longer than an hour
+     */
+    public Length publicBoundary(BigDecimal bearingDegrees, Duration outInAnyHour) {
+        if (outInAnyHour.ms() <= 0 || outInAnyHour.ms() > Duration.MS_PER_HOUR) {
+            throw new ValidationError("the time out is a part of one hour", Context.of("ms", outInAnyHour.ms()));
+        }
+        Length always = boundary(BoundaryKind.RESTRICTED, bearingDegrees);
+        BigDecimal occupancy = outInAnyHour.ratio(new Duration(Duration.MS_PER_HOUR));
+        return outTo(BigDecimal.valueOf(always.um()), occupancy);
     }
 
     /**
@@ -135,8 +151,17 @@ public record RadiationField(
         if (reading.nsvPerHour() == 0) {
             return Length.ZERO;
         }
-        BigDecimal ratio = Decimals.sqrt(Decimals.divide(reading.nsvPerHour(), target.nsvPerHour()));
-        return new Length(Decimals.ceiling(Decimals.multiply(BigDecimal.valueOf(takenAt.um()), ratio)));
+        return outTo(BigDecimal.valueOf(takenAt.um()), Decimals.divide(reading.nsvPerHour(), target.nsvPerHour()));
+    }
+
+    /** The rate at a metre along the bearing, in nanosieverts an hour, with everything in the way applied. */
+    private BigDecimal atOneMetre(BigDecimal bearingDegrees) {
+        return Decimals.multiply(BigDecimal.valueOf(unshieldedAtOneMetre().nsvPerHour()), attenuation(bearingDegrees));
+    }
+
+    /** The inverse square: a distance scaled by the root of a rate ratio, rounded up to the micrometre. */
+    private static Length outTo(BigDecimal micrometres, BigDecimal rateRatio) {
+        return new Length(Decimals.ceiling(Decimals.multiply(micrometres, Decimals.sqrt(rateRatio))));
     }
 
     /** How far back a posting begins along the bearing. */

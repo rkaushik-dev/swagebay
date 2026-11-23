@@ -1,6 +1,7 @@
 package io.github.rkaushikdev.swagebay.safety;
 
 import io.github.rkaushikdev.swagebay.TechniqueError;
+import io.github.rkaushikdev.swagebay.quantities.Duration;
 import io.github.rkaushikdev.swagebay.quantities.Length;
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -45,6 +46,22 @@ public record RopeOff(Length downBeam, Length offBeam, BoundaryKind kind) {
             throw new TechniqueError("there is no source to rope off");
         }
         return new RopeOff(down, off, kind);
+    }
+
+    /**
+     * The public boundary round a field whose source is out for that long in its busiest hour.
+     *
+     * @throws TechniqueError for a field with no source in it
+     * @throws io.github.rkaushikdev.swagebay.ValidationError for a time out that is not part of one
+     *     hour
+     */
+    public static RopeOff forOccupancy(RadiationField radiationField, Duration outInAnyHour) {
+        Length down = radiationField.publicBoundary(DOWN_THE_BEAM, outInAnyHour);
+        Length off = radiationField.publicBoundary(OFF_THE_BEAM, outInAnyHour);
+        if (down.um() == 0) {
+            throw new TechniqueError("there is no source to rope off");
+        }
+        return new RopeOff(down, off, BoundaryKind.RESTRICTED);
     }
 
     /** Whether the two distances differ, as they do with a collimator fitted. */
