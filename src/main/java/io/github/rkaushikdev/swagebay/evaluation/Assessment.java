@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
  *
  * @param disposition what should happen to the weld
  * @param findings every rule that was broken, kind by kind in alphabetical order of the
- *     abbreviation, then the undercut depths
+ *     abbreviation, then the undercut depths, then the accumulation of imperfections
  * @param wall the wall the weld was judged at
  */
 public record Assessment(Disposition disposition, List<Finding> findings, Length wall) {
@@ -59,6 +59,7 @@ public record Assessment(Disposition disposition, List<Finding> findings, Length
                 .sorted(Comparator.comparing(Kind::name))
                 .forEach(kind -> findings.addAll(checkKind(found, kind, wall)));
         findings.addAll(checkUndercutDepth(found, wall));
+        findings.addAll(checkAccumulation(found));
         return new Assessment(dispositionOf(findings), findings, wall);
     }
 
@@ -164,31 +165,86 @@ public record Assessment(Disposition disposition, List<Finding> findings, Length
             return List.of();
         }
         if (Aggregates.windowApplies(weldLength)) {
-            Window window = Aggregates.worstWindow(present, weldLength);
-            if (window.aggregate().compareTo(allowed) > 0) {
-                return List.of(new Finding(
-                        clause,
-                        kind,
-                        window.describe() + " is over the " + allowed.formatMm(1) + " allowed in "
-                                + Aggregates.STANDARD_WINDOW.formatMm(0),
-                        present));
-            }
+            return windowOver(present, weldLength, kind, clause, allowed).stream()
+                    .toList();
+        }
+        return shortWeldFraction
+                .flatMap(fraction ->
+                        fractionOver(present, weldLength, kind, clause, fraction, " of a short weld, over "))
+                .stream()
+                .toList();
+    }
+
+    /**
+     * Section 9.3.13: imperfections of different kinds adding up where none of them fails alone.
+     *
+     * <p>Every kind counts except incomplete penetration due to high low and undercut, which the
+     * clause leaves out, and the kinds that are not judged on length at all: a crack, internal
+     * concavity and an arc burn. Two limits apply on a weld of any length, the total in the worst
+     * twelve inches and the total over the whole weld. One kind on its own is held to its own row,
+     * so an accumulation is only raised where more than one kind contributes to it.
+     */
+    private static List<Finding> checkAccumulation(IndicationSet found) {
+        List<Indication> counted = found.indications().stream()
+                .filter(indication -> Api1104.countsTowardsAccumulation(indication.kind()))
+                .toList();
+        if (counted.isEmpty()) {
             return List.of();
         }
-        if (shortWeldFraction.isEmpty()) {
-            return List.of();
+        Length weldLength = found.weldLength();
+        Kind first = counted.get(0).kind();
+        List<Finding> out = new ArrayList<>();
+        Window window = Aggregates.worstWindow(counted, weldLength);
+        if (kindsIn(found.within(window.startsAt(), window.endsAt())) > 1) {
+            windowOver(counted, weldLength, first, Api1104.ACCUMULATION_CLAUSE, Api1104.ACCUMULATION_AGGREGATE)
+                    .ifPresent(out::add);
         }
+        if (kindsIn(counted) > 1) {
+            fractionOver(
+                            counted,
+                            weldLength,
+                            first,
+                            Api1104.ACCUMULATION_CLAUSE,
+                            Api1104.ACCUMULATION_FRACTION,
+                            " of the weld, over ")
+                    .ifPresent(out::add);
+        }
+        return out;
+    }
+
+    private static long kindsIn(List<Indication> indications) {
+        return indications.stream()
+                .map(Indication::kind)
+                .filter(Api1104::countsTowardsAccumulation)
+                .distinct()
+                .count();
+    }
+
+    /** A finding when the worst standard window holds more than allowed. */
+    private static Optional<Finding> windowOver(
+            List<Indication> present, Length weldLength, Kind kind, String clause, Length allowed) {
+        Window window = Aggregates.worstWindow(present, weldLength);
+        if (window.aggregate().compareTo(allowed) <= 0) {
+            return Optional.empty();
+        }
+        return Optional.of(new Finding(
+                clause,
+                kind,
+                window.describe() + " is over the " + allowed.formatMm(1) + " allowed in "
+                        + Aggregates.STANDARD_WINDOW.formatMm(0),
+                present));
+    }
+
+    /** A finding when the lengths added up are more than that fraction of the weld. */
+    private static Optional<Finding> fractionOver(
+            List<Indication> present, Length weldLength, Kind kind, String clause, BigDecimal allowed, String of) {
         Length total = present.stream().map(Indication::length).reduce(Length.ZERO, Length::plus);
         BigDecimal fraction = Aggregates.fractionOfWeld(total, weldLength);
-        if (fraction.compareTo(shortWeldFraction.get()) > 0) {
-            return List.of(new Finding(
-                    clause,
-                    kind,
-                    total.formatMm(1) + " is " + percent(fraction, 1) + " of a short weld, over "
-                            + percent(shortWeldFraction.get(), 0),
-                    present));
+        if (fraction.compareTo(allowed) <= 0) {
+            return Optional.empty();
         }
-        return List.of();
+        return Optional.of(new Finding(
+                clause, kind, total.formatMm(1) + " is " + percent(fraction, 1) + of + percent(allowed, 0), present));
     }
 
     private static List<Finding> checkUndercutDepth(IndicationSet found, Length wall) {

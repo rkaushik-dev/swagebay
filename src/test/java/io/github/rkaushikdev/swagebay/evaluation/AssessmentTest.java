@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.quantities.Length;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
@@ -238,6 +239,62 @@ class AssessmentTest {
                         "60.0 mm is over the 50.8 mm allowed for one",
                         "3.0 mm across is over the 1.6 mm allowed",
                         "60.0 mm in the 305 mm from 0 mm is over the 50.8 mm allowed in 305 mm");
+    }
+
+    private static Indication fusion(long at, long length) {
+        return new Indication(Kind.IF, mm(at), mm(length));
+    }
+
+    @Test
+    void twoKindsThatPassAloneFailTogetherInOneWindow() {
+        Assessment verdict = assess(weld(fusion(100, 20), slag(150, 40)), WALL);
+        assertThat(verdict.disposition()).isSameAs(Disposition.REPAIR);
+        assertThat(verdict.clauses()).containsExactly("9.3.13");
+        Finding finding = verdict.findings().get(0);
+        assertThat(finding.kind()).isSameAs(Kind.IF);
+        assertThat(finding.reason()).isEqualTo("60.0 mm in the 305 mm from 0 mm is over the 50.8 mm allowed in 305 mm");
+        assertThat(finding.indications()).hasSize(2);
+    }
+
+    @Test
+    void theSameTwoKindsAFootApartAreAccepted() {
+        assertThat(assess(weld(fusion(100, 20), slag(600, 40)), WALL).accepted())
+                .isTrue();
+    }
+
+    @Test
+    void anAccumulationIsAlsoJudgedOnEightPercentOfAWeldOfAnyLength() {
+        List<Indication> groups = new ArrayList<>();
+        for (long at = 0; at <= 2000; at += 500) {
+            groups.add(fusion(at, 20));
+            groups.add(slag(at + 30, 25));
+        }
+        Indication[] spread = groups.toArray(Indication[]::new);
+        assertThat(assess(weld(3000, spread), WALL).accepted()).isTrue();
+        Assessment verdict = assess(weld(2500, spread), WALL);
+        assertThat(verdict.clauses()).containsExactly("9.3.13");
+        assertThat(verdict.findings()).hasSize(1);
+        assertThat(verdict.findings().get(0).reason()).isEqualTo("225.0 mm is 9.0% of the weld, over 8%");
+    }
+
+    @Test
+    void highLowPenetrationAndUndercutAreLeftOutOfAnAccumulation() {
+        Indication highLow = new Indication(Kind.IPD, mm(100), mm(40));
+        Indication undercut = new Indication(Kind.U, mm(100), mm(40));
+        assertThat(assess(weld(highLow, fusion(150, 20)), WALL).accepted()).isTrue();
+        assertThat(assess(weld(undercut, fusion(150, 20)), WALL).accepted()).isTrue();
+        assertThat(Api1104.countsTowardsAccumulation(Kind.IPD)).isFalse();
+        assertThat(Api1104.countsTowardsAccumulation(Kind.U)).isFalse();
+        assertThat(Api1104.countsTowardsAccumulation(Kind.C)).isFalse();
+        assertThat(Api1104.countsTowardsAccumulation(Kind.ESI)).isTrue();
+    }
+
+    @Test
+    void anAccumulationNeedsTwoKindsInTheWorstWindowNotJustOnTheWeld() {
+        Indication[] apart = {slag(0, 40), slag(60, 10), fusion(900, 5)};
+        assertThat(assess(weld(apart), WALL).accepted()).isTrue();
+        Indication[] together = {slag(0, 40), slag(60, 10), fusion(200, 5)};
+        assertThat(assess(weld(together), WALL).clauses()).containsExactly("9.3.13");
     }
 
     @Test

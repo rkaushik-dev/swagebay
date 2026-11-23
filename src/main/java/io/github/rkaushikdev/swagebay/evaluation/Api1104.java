@@ -6,7 +6,9 @@ import io.github.rkaushikdev.swagebay.ValidationError;
 import io.github.rkaushikdev.swagebay.quantities.Length;
 import io.github.rkaushikdev.swagebay.util.Decimals;
 import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * The API 1104 acceptance criteria, as a table rather than as a pile of ifs.
@@ -27,8 +29,13 @@ public final class Api1104 {
     /** The aggregate a short weld's accumulation is judged against. */
     public static final Length ACCUMULATION_AGGREGATE = Length.fromInch(2);
 
-    /** Eight percent of a weld shorter than the window. */
+    /** Eight percent of a weld shorter than the window, and of any weld for an accumulation. */
     public static final BigDecimal ACCUMULATION_FRACTION = new BigDecimal("0.08");
+
+    /** The clause an accumulation of imperfections of different kinds is judged under. */
+    public static final String ACCUMULATION_CLAUSE = "9.3.13";
+
+    private static final Set<Kind> NOT_ACCUMULATED = EnumSet.of(Kind.IPD, Kind.U, Kind.C, Kind.IC, Kind.AB);
 
     /** The deepest undercut accepted on heavy wall. */
     public static final Length UNDERCUT_MAX_DEPTH = Length.fromMm("0.8");
@@ -135,6 +142,17 @@ public final class Api1104 {
     /** Every row, in the order of the standard. */
     public static List<Criterion> allCriteria() {
         return CRITERIA;
+    }
+
+    /**
+     * Whether a kind counts towards an accumulation of imperfections under 9.3.13.
+     *
+     * <p>The clause leaves out incomplete penetration due to high low and undercut. A crack,
+     * internal concavity and an arc burn are not judged on length anywhere in the section, so they
+     * are not added into one either.
+     */
+    public static boolean countsTowardsAccumulation(Kind kind) {
+        return !NOT_ACCUMULATED.contains(kind);
     }
 
     /**
