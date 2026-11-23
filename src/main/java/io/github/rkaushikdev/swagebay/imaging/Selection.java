@@ -29,13 +29,15 @@ public final class Selection {
     public static final HoleSize ESSENTIAL_HOLE = HoleSize.TWO_T;
 
     /**
-     * One band of the hole table.
+     * One band of the hole table, with the wire column that sits beside it.
      *
      * @param ceiling the top of the band, included
      * @param sourceSide the plaque identity for the source side
      * @param filmSide the plaque identity for the film side
+     * @param sourceWire the essential ASTM E747 wire for the source side
+     * @param filmWire the essential ASTM E747 wire for the film side
      */
-    public record HoleBand(Length ceiling, int sourceSide, int filmSide) {}
+    public record HoleBand(Length ceiling, int sourceSide, int filmSide, int sourceWire, int filmWire) {}
 
     /**
      * One band of a wire table.
@@ -48,21 +50,21 @@ public final class Selection {
     private static final String HOLE_TABLE_END = "20.00";
 
     private static final List<HoleBand> HOLE_TABLE = List.of(
-            holeBand("0.25", 12, 10),
-            holeBand("0.375", 15, 12),
-            holeBand("0.50", 17, 15),
-            holeBand("0.75", 20, 17),
-            holeBand("1.00", 25, 20),
-            holeBand("1.50", 30, 25),
-            holeBand("2.00", 35, 30),
-            holeBand("2.50", 40, 35),
-            holeBand("4.00", 50, 40),
-            holeBand("6.00", 60, 50),
-            holeBand("8.00", 80, 60),
-            holeBand("10.00", 100, 80),
-            holeBand("12.00", 120, 100),
-            holeBand("16.00", 160, 120),
-            holeBand(HOLE_TABLE_END, 200, 160));
+            holeBand("0.25", 12, 10, 5, 4),
+            holeBand("0.375", 15, 12, 6, 5),
+            holeBand("0.50", 17, 15, 7, 6),
+            holeBand("0.75", 20, 17, 8, 7),
+            holeBand("1.00", 25, 20, 9, 8),
+            holeBand("1.50", 30, 25, 10, 9),
+            holeBand("2.00", 35, 30, 11, 10),
+            holeBand("2.50", 40, 35, 12, 11),
+            holeBand("4.00", 50, 40, 13, 12),
+            holeBand("6.00", 60, 50, 14, 13),
+            holeBand("8.00", 80, 60, 16, 14),
+            holeBand("10.00", 100, 80, 17, 16),
+            holeBand("12.00", 120, 100, 18, 17),
+            holeBand("16.00", 160, 120, 20, 18),
+            holeBand(HOLE_TABLE_END, 200, 160, 21, 20));
 
     private static final List<WireBand> CLASS_A = List.of(
             wireBand("1.2", 18),
@@ -106,13 +108,31 @@ public final class Selection {
      * @throws TechniqueError past the end of the table at twenty inches
      */
     public static HoleSelection holeSelection(Length thickness, IndicatorSide side) {
+        HoleBand band = bandFor(thickness);
+        int identity = side == IndicatorSide.SOURCE ? band.sourceSide() : band.filmSide();
+        return new HoleSelection(thickness, side, new HoleIndicator(identity), ESSENTIAL_HOLE);
+    }
+
+    /**
+     * Read the wire column beside the hole table, which names an ASTM E747 wire on the same wall
+     * and the same side.
+     *
+     * @throws ValidationError for a thickness that is not positive
+     * @throws TechniqueError past the end of the table at twenty inches
+     */
+    public static AstmWireSelection astmWireSelection(Length thickness, IndicatorSide side) {
+        HoleBand band = bandFor(thickness);
+        int wire = side == IndicatorSide.SOURCE ? band.sourceWire() : band.filmWire();
+        return new AstmWireSelection(thickness, side, new AstmWire(wire));
+    }
+
+    private static HoleBand bandFor(Length thickness) {
         if (thickness.um() <= 0) {
             throw new ValidationError("a nominal thickness has to be positive");
         }
         for (HoleBand band : HOLE_TABLE) {
             if (thickness.compareTo(band.ceiling()) <= 0) {
-                int identity = side == IndicatorSide.SOURCE ? band.sourceSide() : band.filmSide();
-                return new HoleSelection(thickness, side, new HoleIndicator(identity), ESSENTIAL_HOLE);
+                return band;
             }
         }
         throw new TechniqueError(
@@ -123,15 +143,11 @@ public final class Selection {
     /**
      * The top of the band a thickness falls in, for showing the working.
      *
+     * @throws ValidationError for a thickness that is not positive
      * @throws TechniqueError past the end of the table
      */
     public static Length bandCeiling(Length thickness) {
-        for (HoleBand band : HOLE_TABLE) {
-            if (thickness.compareTo(band.ceiling()) <= 0) {
-                return band.ceiling();
-            }
-        }
-        throw new TechniqueError("that thickness is past the end of the indicator table");
+        return bandFor(thickness).ceiling();
     }
 
     /** Whether a thickness sits exactly on a band edge, which reads down. */
@@ -199,23 +215,24 @@ public final class Selection {
      * One entry point, reading whichever table the family names.
      *
      * <p>Both thicknesses are taken rather than one, so the caller cannot hand the wrong one in. The
-     * hole table reads the wall on the given side; a wire table reads the penetrated thickness in the
-     * given class.
+     * hole table and its ASTM wire column read the wall on the given side; an ISO wire table reads
+     * the penetrated thickness in the given class.
      */
     public static IndicatorSelection selectFor(
             Family family, Length wall, Length penetrated, IndicatorSide side, TechniqueClass techniqueClass) {
-        if (family == Family.HOLE) {
-            return holeSelection(wall, side);
-        }
-        return wireSelection(penetrated, techniqueClass);
+        return switch (family) {
+            case HOLE -> holeSelection(wall, side);
+            case ASTM_WIRE -> astmWireSelection(wall, side);
+            case WIRE -> wireSelection(penetrated, techniqueClass);
+        };
     }
 
     private static List<WireBand> table(TechniqueClass techniqueClass) {
         return techniqueClass.isImproved() ? CLASS_B : CLASS_A;
     }
 
-    private static HoleBand holeBand(String ceilingInches, int sourceSide, int filmSide) {
-        return new HoleBand(Length.fromInch(ceilingInches), sourceSide, filmSide);
+    private static HoleBand holeBand(String ceilingInches, int sourceSide, int filmSide, int sourceWire, int filmWire) {
+        return new HoleBand(Length.fromInch(ceilingInches), sourceSide, filmSide, sourceWire, filmWire);
     }
 
     private static WireBand wireBand(String ceilingMm, int wire) {
