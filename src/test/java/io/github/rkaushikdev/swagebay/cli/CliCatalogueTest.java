@@ -3,6 +3,7 @@ package io.github.rkaushikdev.swagebay.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.rkaushikdev.swagebay.ValidationError;
+import io.github.rkaushikdev.swagebay.util.Text;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,5 +97,44 @@ class CliCatalogueTest {
     void theChartListShowsTheRangeEachOneCovers() {
         String output = shop.run("catalogue", "charts").out();
         assertThat(output).contains("6.4 mm", "63.5 mm");
+    }
+
+    @Test
+    void theDeviceListHasALineForEveryIsotopeOnACertificate() {
+        List<String> lines = shop.run("catalogue", "devices").lines();
+        assertThat(Text.words(lines.get(0)))
+                .containsExactly("key", "device", "isotope", "capacity", "kg", "guide", "tube", "category");
+        assertThat(lines).filteredOn(line -> line.startsWith("880e")).hasSize(2);
+        assertThat(lines)
+                .anySatisfy(line -> assertThat(line).startsWith("880e").contains("Se-75"))
+                .anySatisfy(line -> assertThat(line).startsWith("tk100").contains("Co-60"));
+    }
+
+    @Test
+    void theAstmWiresAreListedWithTheirSets() {
+        Shell.Result result = shop.run("catalogue", "indicators", "--astm");
+        assertThat(result.code()).isZero();
+        assertThat(result.out()).contains("hole identities", "0.0032 in", "0.3200 in", "A/B");
+        assertThat(result.out()).doesNotContain("W1 ");
+    }
+
+    @Test
+    void aHoleInTheTableIsStillPrintedAsOne() {
+        String output = shop.run("catalogue", "materials", "--quality", "KV100").out();
+        assertThat(output).contains("not published");
+        assertThat(output).containsPattern("zinc\\s+zinc\\s+7140\\s+not published");
+    }
+
+    @Test
+    void theDeviceListCarriesTheGuideTubeAndTheCategory() {
+        List<String> lines = shop.run("catalogue", "devices").lines();
+        assertThat(lines)
+                .filteredOn(line -> line.startsWith("tk100"))
+                .singleElement()
+                .satisfies(line -> assertThat(Text.words(line)).endsWith("6", "m", "II"));
+        assertThat(lines)
+                .filteredOn(line -> line.startsWith("spec150"))
+                .singleElement()
+                .satisfies(line -> assertThat(Text.words(line)).endsWith("9", "m", "I"));
     }
 }
